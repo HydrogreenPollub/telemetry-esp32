@@ -7,11 +7,9 @@ TODO list
 5. Communication with MASTER - 
 6.
 */
-
-
-
 #include <stdint.h>
 #include <stdio.h>
+#include "driver/sdmmc_types.h"
 #include "esp_event.h"
 #include "esp_netif_types.h"
 #include "esp_wifi_types.h"
@@ -26,34 +24,49 @@ TODO list
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
+#include "sdmmc_cmd.h"
+
 static const char *TAG = "WiFi";
 static const char *TAG1 = "MQTT";
-char Current_date;
+static const char *TAG2 = "UART";
+
 bool wifi_ready=0;
 esp_mqtt_client_handle_t client;
+
 struct data{
-  float FC_V;
-  float FC_C;
-  float SC_C;
-  float SC_V;
-  float Speed;
-  float Fan_RPM;
-  float Temperature;
-  float HG_pressure;
+  float fuel_cell_voltage; //current_fuel_voltage
+  float fuel_cell_current;
+  float supper_capacitor_current;//supper_capacitor_current
+  float supper_capacitor_voltage;
+  float speed;
+  float fan_RPM;
+  float cell_temperature;
+  float pressure_hg;
+  float motor_current;
+  uint8_t error_reason;
   //one bits
-  bool HG_sens;
-  bool Speed_button;
-  bool Half_Speed_button;
-  bool honk;
-  bool Transmiter_state;
-  short int HG_Cell_button;
-}data;
+  union{
+    struct
+     {
+      uint8_t Speed_button:1;
+      uint8_t Half_Speed_button:1;
+      uint8_t Emergency:1;
+      uint8_t HG_Cell_button:2;
+      uint8_t supper_capacitor_button:1;
+      uint8_t relay_state:1;
+      uint8_t hg_sens:1;
+    };
+    uint8_t logic_state; //nazwa robocza
+  };
+ }data;
+
 static void log_error_if_nonzero(const char *message, int error_code)
 {
     if (error_code != 0) {
         ESP_LOGE(TAG1, "Last error %s: 0x%x", message, error_code);
     }
 }
+
 static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
   switch (event_id) {
@@ -67,7 +80,6 @@ static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_b
       ESP_LOGI(TAG,"IP acq");
       wifi_ready = 1;
       break;
-    
   }
 }
 
@@ -101,41 +113,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
   switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
       ESP_LOGI(TAG1, "MQTT_EVENT_CONNECTED");
-      msg_id = esp_mqtt_client_subscribe(client, "/sensors/FC_V", 0);
-      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
-  
-      msg_id = esp_mqtt_client_subscribe(client, "/sensors/FC_C", 0);
-      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
-      
-      msg_id = esp_mqtt_client_subscribe(client, "/sensors/SC_V", 0);
-      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
-
-      msg_id = esp_mqtt_client_subscribe(client, "/sensors/SC_C", 0);
-      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
-      
-      msg_id = esp_mqtt_client_subscribe(client, "/sensors/Speed", 0);
-      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
-      
-      msg_id = esp_mqtt_client_subscribe(client, "/sensors/Temperature", 0);
-      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
-      
-      msg_id = esp_mqtt_client_subscribe(client, "/buttons/HG_sens", 0);
-      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
-      
-      msg_id = esp_mqtt_client_subscribe(client, "/buttons/SPG", 0);
-      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
-      
-      msg_id = esp_mqtt_client_subscribe(client, "/buttons/SPPG", 0);
-      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
-      
-      msg_id = esp_mqtt_client_subscribe(client, "/buttons/SPO", 0);
-      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
-      
-      msg_id = esp_mqtt_client_subscribe(client, "/buttons/SP", 0);
-      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
-      
-      msg_id = esp_mqtt_client_subscribe(client, "/sensors/HG_pressure", 0);
-      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
       break;
 
     case MQTT_EVENT_DISCONNECTED:
@@ -180,28 +157,55 @@ static void mqtt_app_start(void)
     esp_mqtt_client_start(client);
 }
 void send_data(void *pvParameter){
-  char buff[255];
-  sprintf(buff,"%f",data.FC_V);
-  esp_mqtt_client_publish(client,"/sensory/FC_V",buff,0,1,0);
+  char buff[4];
+
+  memcpy(&buff,&data.fuel_cell_current,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensory/fuel_cell_current",buff,0,1,0);
+
+  memcpy(&buff,&data.fuel_cell_voltage,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensory/fuel_cell_voltage",buff,0,1,0);
+
+  memcpy(&buff,&data.supper_capacitor_current,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensory/supper_capacitor_current",buff,0,1,0);
+
+  memcpy(&buff,&data.supper_capacitor_voltage,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensory/supper_capacitor_voltage",buff,0,1,0);
+
+  memcpy(&buff,&data.speed,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensory/speed",buff,0,1,0);
+
+  memcpy(&buff,&data.fan_RPM,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensory/fan_RPM",buff,0,1,0);
+
+  memcpy(&buff,&data.cell_temperature,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensory/cell_temperature",buff,0,1,0);
+
+  memcpy(&buff,&data.pressure_hg,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensory/pressure_hg",buff,0,1,0);
+
+  memcpy(&buff,&data.motor_current,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensory/motor_current",buff,0,1,0);
+  char buff2; 
+  memcpy(&buff2,&data.logic_state,sizeof(char));
+  esp_mqtt_client_publish(client,"/logic",buff,0,1,0);
 }
-/*
- *int esp_mqtt_client_publish(client,"TOPIC DO USTALENIA",DANE_Z_MASTERA,0,1,0);
- 
- */
+
+void blackbox(){
+}
 void app_main(void)
 {
-    esp_log_level_set("*", ESP_LOG_INFO);
-    esp_log_level_set("mqtt_client", ESP_LOG_VERBOSE);
-    esp_log_level_set("MQTT_EXAMPLE", ESP_LOG_VERBOSE);
-    esp_log_level_set("TRANSPORT_BASE", ESP_LOG_VERBOSE);
-    esp_log_level_set("esp-tls", ESP_LOG_VERBOSE);
-    esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
-    esp_log_level_set("outbox", ESP_LOG_VERBOSE);
+  esp_log_level_set("*", ESP_LOG_INFO);
+  esp_log_level_set("mqtt_client", ESP_LOG_VERBOSE);
+  esp_log_level_set("MQTT_EXAMPLE", ESP_LOG_VERBOSE);
+  esp_log_level_set("TRANSPORT_BASE", ESP_LOG_VERBOSE);
+  esp_log_level_set("esp-tls", ESP_LOG_VERBOSE);
+  esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
+  esp_log_level_set("outbox", ESP_LOG_VERBOSE);
 
   wifi_connection();
   while(!wifi_ready){
     ESP_LOGI(TAG,"Connecting to WIFI");
+    vTaskDelay(500/portTICK_PERIOD_MS);
   }
   mqtt_app_start();
-  vTaskDelay(5000/portTICK_PERIOD_MS);
 }
