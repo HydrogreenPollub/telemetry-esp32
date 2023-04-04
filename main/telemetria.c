@@ -1,7 +1,7 @@
 /*
 TODO list
 1. Connect to wifi +
-2. Connect to SQL > OR < Create web soccet? -
+2. Connect to MQTT service +
 3. Create JSON - 
 4. Write JSON to SDCARD - 
 5. Communication with MASTER - 
@@ -17,6 +17,8 @@ TODO list
 #include "esp_wifi_types.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
+#include "freertos/queue.h"
 #include "esp_wifi.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
@@ -26,7 +28,32 @@ TODO list
 #include "lwip/netdb.h"
 static const char *TAG = "WiFi";
 static const char *TAG1 = "MQTT";
-
+char Current_date;
+bool wifi_ready=0;
+esp_mqtt_client_handle_t client;
+struct data{
+  float FC_V;
+  float FC_C;
+  float SC_C;
+  float SC_V;
+  float Speed;
+  float Fan_RPM;
+  float Temperature;
+  float HG_pressure;
+  //one bits
+  bool HG_sens;
+  bool Speed_button;
+  bool Half_Speed_button;
+  bool honk;
+  bool Transmiter_state;
+  short int HG_Cell_button;
+}data;
+static void log_error_if_nonzero(const char *message, int error_code)
+{
+    if (error_code != 0) {
+        ESP_LOGE(TAG1, "Last error %s: 0x%x", message, error_code);
+    }
+}
 static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
   switch (event_id) {
@@ -38,13 +65,15 @@ static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_b
       break;
     case IP_EVENT_STA_GOT_IP:
       ESP_LOGI(TAG,"IP acq");
+      wifi_ready = 1;
       break;
+    
   }
 }
 
 void wifi_connection(){
-  nvs_flash_init();
-  esp_netif_init();
+  nvs_flash_init(); //non volatile memory initialization
+  esp_netif_init();//
   esp_event_loop_create_default();
   esp_netif_create_default_wifi_sta();
   wifi_init_config_t wifi_initiation = WIFI_INIT_CONFIG_DEFAULT();
@@ -72,17 +101,41 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
   switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
       ESP_LOGI(TAG1, "MQTT_EVENT_CONNECTED");
-      msg_id = esp_mqtt_client_publish(client, "/topic/qos1", "data_3", 0, 1, 0);
-      ESP_LOGI(TAG1, "sent publish successful, msg_id=%d", msg_id);
-
-      msg_id = esp_mqtt_client_subscribe(client, "/topic/qos0", 0);
+      msg_id = esp_mqtt_client_subscribe(client, "/sensors/FC_V", 0);
+      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
+  
+      msg_id = esp_mqtt_client_subscribe(client, "/sensors/FC_C", 0);
+      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
+      
+      msg_id = esp_mqtt_client_subscribe(client, "/sensors/SC_V", 0);
       ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
 
-      msg_id = esp_mqtt_client_subscribe(client, "/topic/qos1", 1);
+      msg_id = esp_mqtt_client_subscribe(client, "/sensors/SC_C", 0);
       ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
-
-      msg_id = esp_mqtt_client_unsubscribe(client, "/topic/qos1");
-      ESP_LOGI(TAG1, "sent unsubscribe successful, msg_id=%d", msg_id);
+      
+      msg_id = esp_mqtt_client_subscribe(client, "/sensors/Speed", 0);
+      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
+      
+      msg_id = esp_mqtt_client_subscribe(client, "/sensors/Temperature", 0);
+      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
+      
+      msg_id = esp_mqtt_client_subscribe(client, "/buttons/HG_sens", 0);
+      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
+      
+      msg_id = esp_mqtt_client_subscribe(client, "/buttons/SPG", 0);
+      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
+      
+      msg_id = esp_mqtt_client_subscribe(client, "/buttons/SPPG", 0);
+      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
+      
+      msg_id = esp_mqtt_client_subscribe(client, "/buttons/SPO", 0);
+      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
+      
+      msg_id = esp_mqtt_client_subscribe(client, "/buttons/SP", 0);
+      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
+      
+      msg_id = esp_mqtt_client_subscribe(client, "/sensors/HG_pressure", 0);
+      ESP_LOGI(TAG1, "sent subscribe successful, msg_id=%d", msg_id);
       break;
 
     case MQTT_EVENT_DISCONNECTED:
@@ -91,8 +144,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
     case MQTT_EVENT_SUBSCRIBED:
       ESP_LOGI(TAG1, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-      msg_id = esp_mqtt_client_publish(client, "/topic/qos0", "data", 0, 0, 0);
-      ESP_LOGI(TAG1, "sent publish successful, msg_id=%d", msg_id);
       break;
 
     case MQTT_EVENT_PUBLISHED:
@@ -108,32 +159,49 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(TAG1, "Last errno string (%s)", strerror(event->error_handle->esp_transport_sock_errno));
         }
       break;
-
+    case MQTT_EVENT_DATA:
+       ESP_LOGI(TAG, "MQTT_EVENT_DATA");
+      printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);  
+    printf("DATA=%.*s\r\n", event->data_len, event->data);
     default:
       ESP_LOGI(TAG, "Other event id:%d", event->event_id);
       break;
-    }
+      
+  }
 }
 
-static void mqtt_app_start(void)
+static void mqtt_app_start(void) 
 {
-    esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri = "URL-dopisac-",
+  esp_mqtt_client_config_t mqtt_cfg = {
+        .broker.address.uri = "mqtt://192.168.163.223:1883",
     };
- esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-    /* The last argument may be used to pass data to the event handler, in this example mqtt_event_handler */
+  esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
 }
-
+void send_data(void *pvParameter){
+  char buff[255];
+  sprintf(buff,"%f",data.FC_V);
+  esp_mqtt_client_publish(client,"/sensory/FC_V",buff,0,1,0);
+}
 /*
- * int esp_mqtt_client_publish(esp_mqtt_client_handle_t client, const char *topic, const char *data, int len, int qos, int retain
  *int esp_mqtt_client_publish(client,"TOPIC DO USTALENIA",DANE_Z_MASTERA,0,1,0);
  
  */
 void app_main(void)
 {
+    esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set("mqtt_client", ESP_LOG_VERBOSE);
+    esp_log_level_set("MQTT_EXAMPLE", ESP_LOG_VERBOSE);
+    esp_log_level_set("TRANSPORT_BASE", ESP_LOG_VERBOSE);
+    esp_log_level_set("esp-tls", ESP_LOG_VERBOSE);
+    esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
+    esp_log_level_set("outbox", ESP_LOG_VERBOSE);
+
   wifi_connection();
+  while(!wifi_ready){
+    ESP_LOGI(TAG,"Connecting to WIFI");
+  }
   mqtt_app_start();
   vTaskDelay(5000/portTICK_PERIOD_MS);
 }
