@@ -9,7 +9,7 @@ TODO list
 */
 #include <stdint.h>
 #include <stdio.h>
-#include "driver/sdmmc_types.h"
+#include "esp_err.h"
 #include "esp_event.h"
 #include "esp_netif_types.h"
 #include "esp_wifi_types.h"
@@ -24,12 +24,15 @@ TODO list
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
+#include "driver/sdmmc_host.h"
+#include "driver/sdmmc_defs.h"
 #include "sdmmc_cmd.h"
+#include "esp_vfs_fat.h"
 
 static const char *TAG = "WiFi";
 static const char *TAG1 = "MQTT";
 static const char *TAG2 = "UART";
-
+static const char *TAG3 = "SD_CARD";
 bool wifi_ready=0;
 esp_mqtt_client_handle_t client;
 
@@ -190,7 +193,33 @@ void send_data(void *pvParameter){
   esp_mqtt_client_publish(client,"/logic",buff,0,1,0);
 }
 
-void blackbox(){
+static esp_err_t sd_card_start(){
+  sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
+    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+        .format_if_mount_failed = false,
+        .max_files = 3,
+    };
+    sdmmc_card_t *card;
+    esp_err_t err = esp_vfs_fat_sdmmc_mount("/sdcard", &host, &slot_config, &mount_config, &card);
+    if (err != ESP_OK)
+    {
+        return err;
+    }
+    return ESP_OK;
+}
+static esp_err_t sd_card_write(const char *path, char *data){
+  ESP_LOGI(TAG, "Opening file %s", path);
+  FILE *f = fopen(path, "w");
+  if (f == NULL) {
+    ESP_LOGE(TAG, "Failed to open file for writing");
+    return ESP_FAIL;
+  }
+  fprintf(f, data);
+  fclose(f);
+  ESP_LOGI(TAG, "File written");
+
+  return ESP_OK;
 }
 void app_main(void)
 {
@@ -208,4 +237,5 @@ void app_main(void)
     vTaskDelay(500/portTICK_PERIOD_MS);
   }
   mqtt_app_start();
+
 }
