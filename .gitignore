@@ -2,5 +2,6 @@ build/
 esp_idf_components/
 managed_components/
 sdkconfig.old
+sdkconfig
 .project
 .cache/

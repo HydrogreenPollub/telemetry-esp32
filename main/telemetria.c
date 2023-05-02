@@ -9,6 +9,7 @@ TODO list
 */
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include "esp_err.h"
 #include "esp_event.h"
 #include "esp_netif_types.h"
@@ -28,7 +29,13 @@ TODO list
 #include "driver/sdmmc_defs.h"
 #include "sdmmc_cmd.h"
 #include "esp_vfs_fat.h"
+#include "driver/uart.h"
+#define TXD_PIN (GPIO_NUM_17)
+#define RXD_PIN (GPIO_NUM_16)
+#define BUF_SIZE (256)
 
+TaskHandle_t mqtthandle = NULL;
+TaskHandle_t SDCardHandle = NULL;
 static const char *TAG = "WiFi";
 static const char *TAG1 = "MQTT";
 static const char *TAG2 = "UART";
@@ -98,8 +105,8 @@ void wifi_connection(){
   
   wifi_config_t wifi_configuration = {
     .sta ={
-      .ssid = "NiePodejrzaneWIFI",
-      .password = "zaq1@WSX"
+      .ssid = CONFIG_ESP_WIFI_SSID,
+      .password = CONFIG_ESP_WIFI_PASSWORD
     }};
   esp_wifi_set_mode(WIFI_MODE_STA);
   esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration);
@@ -153,7 +160,12 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 static void mqtt_app_start(void) 
 {
   esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri = "mqtt://192.168.163.223:1883",
+        .broker.address.hostname =  CONFIG_MQTT_HOSTNAME,
+        .broker.address.transport = MQTT_TRANSPORT_OVER_TCP,
+        .broker.address.port = CONFIG_MQTT_PORT,
+        .credentials.username = CONFIG_MQTT_USERNAME,
+        .credentials.authentication.password = CONFIG_MQTT_PASSWD
+        
     };
   esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
@@ -191,6 +203,7 @@ void send_data(void *pvParameter){
   char buff2; 
   memcpy(&buff2,&data.logic_state,sizeof(char));
   esp_mqtt_client_publish(client,"/logic",buff,0,1,0);
+  vTaskDelete(mqtthandle);
 }
 
 static esp_err_t sd_card_start(){
@@ -208,21 +221,46 @@ static esp_err_t sd_card_start(){
     }
     return ESP_OK;
 }
-static esp_err_t sd_card_write(const char *path, char *data){
-  ESP_LOGI(TAG, "Opening file %s", path);
-  FILE *f = fopen(path, "w");
-  if (f == NULL) {
-    ESP_LOGE(TAG, "Failed to open file for writing");
-    return ESP_FAIL;
-  }
-  fprintf(f, data);
-  fclose(f);
-  ESP_LOGI(TAG, "File written");
-
-  return ESP_OK;
+static void sd_card_write(void *arg){
 }
+
+
+static void UART_TASK(void *arg){
+  // Configure UART parameters
+  const uart_port_t uart_num = UART_NUM_2;
+  uart_config_t uart_config = {
+    .baud_rate = 115200,
+    .data_bits = UART_DATA_8_BITS,
+    .parity = UART_PARITY_DISABLE,
+    .stop_bits = UART_STOP_BITS_1,
+    .flow_ctrl = UART_HW_FLOWCTRL_CTS_RTS,
+    .rx_flow_ctrl_thresh = 122,
+  };
+  // Set UART log level
+  esp_log_level_set(TAG, ESP_LOG_INFO);
+  ESP_LOGI(TAG2, "Start RS485 application configure UART.");
+  
+   // Install UART driver
+  ESP_ERROR_CHECK(uart_driver_install(uart_num,BUF_SIZE, 0, 0, NULL, 0));
+  // Configure UART parameters
+  ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
+  ESP_LOGI(TAG, "UART set pins, mode and install driver.");
+  //configure UART Pins
+  ESP_ERROR_CHECK(uart_set_pin(uart_num, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+  uint8_t *rx_data = (uint8_t *) malloc(BUF_SIZE);
+  while(1){
+    int len = uart_read_bytes(uart_num, rx_data, (BUF_SIZE - 1), 20 / portTICK_PERIOD_MS);
+    if(len>0){
+      memcpy(&data,&rx_data,sizeof(rx_data));
+      if(mqtthandle == NULL)xTaskCreatePinnedToCore(send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &mqtthandle,1);
+      if(SDCardHandle == NULL)xTaskCreatePinnedToCore(sd_card_write,"SD_CARD_WRITE",1024*2,NULL,10,&SDCardHandle,1);
+    }
+  }
+}
+
 void app_main(void)
 {
+  // POTRZEBNE?
   esp_log_level_set("*", ESP_LOG_INFO);
   esp_log_level_set("mqtt_client", ESP_LOG_VERBOSE);
   esp_log_level_set("MQTT_EXAMPLE", ESP_LOG_VERBOSE);
@@ -230,12 +268,12 @@ void app_main(void)
   esp_log_level_set("esp-tls", ESP_LOG_VERBOSE);
   esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
   esp_log_level_set("outbox", ESP_LOG_VERBOSE);
-
+  // ?????????????
   wifi_connection();
   while(!wifi_ready){
     ESP_LOGI(TAG,"Connecting to WIFI");
     vTaskDelay(500/portTICK_PERIOD_MS);
   }
   mqtt_app_start();
-
+  xTaskCreatePinnedToCore(UART_TASK, "uart_echo_task",1024*2, NULL, 10, NULL,0);
 }

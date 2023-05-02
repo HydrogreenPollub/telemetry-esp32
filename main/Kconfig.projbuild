@@ -1,0 +1,36 @@
+
+menu "Project Configuration"
+
+    config ESP_WIFI_SSID
+        string "WiFi SSID"
+        default "wifi_ssid"
+        help
+            SSID (network name) for the example to connect to.
+
+    config ESP_WIFI_PASSWORD
+        string "WiFi Password"
+        default "wifi_passwd"
+        help
+            WiFi password (WPA or WPA2) for the example to use.
+
+    config MQTT_USERNAME
+        string "MQTT USERNAME"
+        default "user"
+        help
+            MQTT user name credientials
+    config MQTT_PASSWD
+        string "MQTT_PASSWORD"
+        default "password"
+        help 
+            MQTT password for user
+    config MQTT_HOSTNAME
+        string "MQTT HOSTNAME"
+        default "Your host name"
+        help
+            Your host IPv4
+    config MQTT_PORT
+        int "MQTT PORT"
+        default 1883
+        help 
+            MQTT PORT SELECTED 
+endmenu
