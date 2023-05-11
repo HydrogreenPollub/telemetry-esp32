@@ -43,32 +43,30 @@ static const char *TAG3 = "SD_CARD";
 bool wifi_ready=0;
 esp_mqtt_client_handle_t client;
 
-struct data{
-  float fuel_cell_voltage; //current_fuel_voltage
+struct data {
+  float fuel_cell_voltage;
   float fuel_cell_current;
-  float supper_capacitor_current;//supper_capacitor_current
-  float supper_capacitor_voltage;
-  float speed;
-  float fan_RPM;
-  float cell_temperature;
-  float pressure_hg;
+  float super_capacitor_current;
+  float super_capacitor_voltage;
+  float vehicle_speed;
+  float fan_rpm;
+  float fuel_cell_temperature;
+  float hydrogen_pressure;
   float motor_current;
-  uint8_t error_reason;
-  //one bits
-  union{
-    struct
-     {
-      uint8_t Speed_button:1;
-      uint8_t Half_Speed_button:1;
-      uint8_t Emergency:1;
-      uint8_t HG_Cell_button:2;
-      uint8_t supper_capacitor_button:1;
-      uint8_t relay_state:1;
-      uint8_t hg_sens:1;
+  uint8_t error_codes;
+  union {
+    struct { // TODO remove bitfield since it won't be used here anyway
+      uint8_t vehicle_is_speed_button_pressed:1;
+      uint8_t vehicle_is_half_speed_button_pressed:1;
+      uint8_t is_emergency:1;
+      uint8_t hydrogen_cell_button_state:2; // Split into two variables?
+      uint8_t is_super_capacitor_button_pressed:1;
+      uint8_t is_relay_closed:1;
+      uint8_t is_hydrogen_leaking:1;
     };
-    uint8_t logic_state; //nazwa robocza
+    uint8_t logic_state;
   };
- }data;
+} data;
 
 static void log_error_if_nonzero(const char *message, int error_code)
 {
@@ -175,31 +173,31 @@ void send_data(void *pvParameter){
   char buff[4];
 
   memcpy(&buff,&data.fuel_cell_current,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensory/fuel_cell_current",buff,0,1,0);
+  esp_mqtt_client_publish(client,"/sensors/fuel_cell_current",buff,0,1,0);
 
   memcpy(&buff,&data.fuel_cell_voltage,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensory/fuel_cell_voltage",buff,0,1,0);
+  esp_mqtt_client_publish(client,"/sensors/fuel_cell_voltage",buff,0,1,0);
 
-  memcpy(&buff,&data.supper_capacitor_current,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensory/supper_capacitor_current",buff,0,1,0);
+  memcpy(&buff,&data.super_capacitor_current,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensors/super_capacitor_current",buff,0,1,0);
 
-  memcpy(&buff,&data.supper_capacitor_voltage,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensory/supper_capacitor_voltage",buff,0,1,0);
+  memcpy(&buff,&data.super_capacitor_voltage,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensors/super_capacitor_voltage",buff,0,1,0);
 
-  memcpy(&buff,&data.speed,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensory/speed",buff,0,1,0);
+  memcpy(&buff,&data.vehicle_speed,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensors/vehicle_speed",buff,0,1,0);
 
-  memcpy(&buff,&data.fan_RPM,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensory/fan_RPM",buff,0,1,0);
+  memcpy(&buff,&data.fan_rpm,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensors/fan_rpm",buff,0,1,0);
 
-  memcpy(&buff,&data.cell_temperature,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensory/cell_temperature",buff,0,1,0);
+  memcpy(&buff,&data.fuel_cell_temperature,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensors/fuel_cell_temperature",buff,0,1,0);
 
-  memcpy(&buff,&data.pressure_hg,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensory/pressure_hg",buff,0,1,0);
+  memcpy(&buff,&data.hydrogen_pressure,sizeof(float));
+  esp_mqtt_client_publish(client,"/sensors/hydrogen_pressure",buff,0,1,0);
 
   memcpy(&buff,&data.motor_current,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensory/motor_current",buff,0,1,0);
+  esp_mqtt_client_publish(client,"/sensors/motor_current",buff,0,1,0);
   char buff2; 
   memcpy(&buff2,&data.logic_state,sizeof(char));
   esp_mqtt_client_publish(client,"/logic",buff,0,1,0);
