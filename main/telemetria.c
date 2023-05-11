@@ -1,12 +1,3 @@
-/*
-TODO list
-1. Connect to wifi +
-2. Connect to MQTT service +
-3. Create JSON - 
-4. Write JSON to SDCARD - 
-5. Communication with MASTER - 
-6.
-*/
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -30,6 +21,7 @@ TODO list
 #include "sdmmc_cmd.h"
 #include "esp_vfs_fat.h"
 #include "driver/uart.h"
+#include "endian.h"
 #define TXD_PIN (GPIO_NUM_17)
 #define RXD_PIN (GPIO_NUM_16)
 #define BUF_SIZE (256)
@@ -117,26 +109,22 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
   ESP_LOGD(TAG1, "Event dispatched from event loop base=%s, event_id=%" PRIi32 "", base, event_id);
   esp_mqtt_event_handle_t event = event_data;
   esp_mqtt_client_handle_t client = event->client;
-  int msg_id;
   switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
       ESP_LOGI(TAG1, "MQTT_EVENT_CONNECTED");
+      esp_mqtt_client_publish(client,"/siema","Siema",0,1,0);
       break;
 
     case MQTT_EVENT_DISCONNECTED:
       ESP_LOGI(TAG1, "MQTT_EVENT_DISCONNECTED");
       break;
-
-    case MQTT_EVENT_SUBSCRIBED:
-      ESP_LOGI(TAG1, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-      break;
-
+      
     case MQTT_EVENT_PUBLISHED:
       ESP_LOGI(TAG1, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
-      break;
 
     case MQTT_EVENT_ERROR:
       ESP_LOGI(TAG1, "MQTT_EVENT_ERROR");
+      ESP_LOGI(TAG1, "MQTT_EVENT ERROR CODE, error_code=%d", event->error_handle->error_type);
       if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
         log_error_if_nonzero("reported from esp-tls", event->error_handle->esp_tls_last_esp_err);
         log_error_if_nonzero("reported from tls stack", event->error_handle->esp_tls_stack_err);
@@ -144,10 +132,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(TAG1, "Last errno string (%s)", strerror(event->error_handle->esp_transport_sock_errno));
         }
       break;
-    case MQTT_EVENT_DATA:
-       ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-      printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);  
-    printf("DATA=%.*s\r\n", event->data_len, event->data);
     default:
       ESP_LOGI(TAG, "Other event id:%d", event->event_id);
       break;
@@ -165,7 +149,7 @@ static void mqtt_app_start(void)
         .credentials.authentication.password = CONFIG_MQTT_PASSWD
         
     };
-  esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
+   client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
 }
@@ -198,26 +182,14 @@ void send_data(void *pvParameter){
 
   memcpy(&buff,&data.motor_current,sizeof(float));
   esp_mqtt_client_publish(client,"/sensors/motor_current",buff,0,1,0);
-  char buff2; 
-  memcpy(&buff2,&data.logic_state,sizeof(char));
-  esp_mqtt_client_publish(client,"/logic",buff,0,1,0);
+  
+  char buff2[4]= {data.logic_state,0,0,0}; 
+  ESP_LOGI(TAG1,"%s",buff2);
+  esp_mqtt_client_publish(client,"/logic",buff2,0,1,0);
   vTaskDelete(mqtthandle);
 }
 
 static esp_err_t sd_card_start(){
-  sdmmc_host_t host = SDMMC_HOST_DEFAULT();
-    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
-    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
-        .format_if_mount_failed = false,
-        .max_files = 3,
-    };
-    sdmmc_card_t *card;
-    esp_err_t err = esp_vfs_fat_sdmmc_mount("/sdcard", &host, &slot_config, &mount_config, &card);
-    if (err != ESP_OK)
-    {
-        return err;
-    }
-    return ESP_OK;
 }
 static void sd_card_write(void *arg){
 }
@@ -231,13 +203,10 @@ static void UART_TASK(void *arg){
     .data_bits = UART_DATA_8_BITS,
     .parity = UART_PARITY_DISABLE,
     .stop_bits = UART_STOP_BITS_1,
-    .flow_ctrl = UART_HW_FLOWCTRL_CTS_RTS,
-    .rx_flow_ctrl_thresh = 122,
+    .source_clk = UART_SCLK_DEFAULT,
   };
   // Set UART log level
-  esp_log_level_set(TAG, ESP_LOG_INFO);
   ESP_LOGI(TAG2, "Start RS485 application configure UART.");
-  
    // Install UART driver
   ESP_ERROR_CHECK(uart_driver_install(uart_num,BUF_SIZE, 0, 0, NULL, 0));
   // Configure UART parameters
@@ -247,11 +216,15 @@ static void UART_TASK(void *arg){
   ESP_ERROR_CHECK(uart_set_pin(uart_num, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
   uint8_t *rx_data = (uint8_t *) malloc(BUF_SIZE);
   while(1){
+    
+    //ESP_LOGI(TAG2, "SIEMA SIEMA UART Pętla WITA");
     int len = uart_read_bytes(uart_num, rx_data, (BUF_SIZE - 1), 20 / portTICK_PERIOD_MS);
     if(len>0){
+
+      ESP_LOGI(TAG2, "SIEMA SIEMA UART warunek WITA");
       memcpy(&data,&rx_data,sizeof(rx_data));
       if(mqtthandle == NULL)xTaskCreatePinnedToCore(send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &mqtthandle,1);
-      if(SDCardHandle == NULL)xTaskCreatePinnedToCore(sd_card_write,"SD_CARD_WRITE",1024*2,NULL,10,&SDCardHandle,1);
+//      if(SDCardHandle == NULL)xTaskCreatePinnedToCore(sd_card_write,"SD_CARD_WRITE",1024*2,NULL,10,&SDCardHandle,1);
     }
   }
 }
@@ -273,5 +246,6 @@ void app_main(void)
     vTaskDelay(500/portTICK_PERIOD_MS);
   }
   mqtt_app_start();
-  xTaskCreatePinnedToCore(UART_TASK, "uart_echo_task",1024*2, NULL, 10, NULL,0);
+//  xTaskCreatePinnedToCore(send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &mqtthandle,1);
+  xTaskCreatePinnedToCore(UART_TASK, "uart_echo_task",1024*4, NULL, 2, NULL,0);
 }
