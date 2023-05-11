@@ -112,7 +112,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
   switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
       ESP_LOGI(TAG1, "MQTT_EVENT_CONNECTED");
-      esp_mqtt_client_publish(client,"/siema","Siema",0,1,0);
       break;
 
     case MQTT_EVENT_DISCONNECTED:
@@ -120,10 +119,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
       break;
       
     case MQTT_EVENT_PUBLISHED:
-      ESP_LOGI(TAG1, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
-
+      ESP_LOGI(TAG1, "MQTT_SENT");
     case MQTT_EVENT_ERROR:
-      ESP_LOGI(TAG1, "MQTT_EVENT_ERROR");
       ESP_LOGI(TAG1, "MQTT_EVENT ERROR CODE, error_code=%d", event->error_handle->error_type);
       if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
         log_error_if_nonzero("reported from esp-tls", event->error_handle->esp_tls_last_esp_err);
@@ -157,31 +154,32 @@ void send_data(void *pvParameter){
   char buff[4];
 
   memcpy(&buff,&data.fuel_cell_current,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/fuel_cell_current",buff,0,1,0);
+  esp_mqtt_client_publish(client,"/sensors/fuel_cell_current",buff,4,1,0);
 
   memcpy(&buff,&data.fuel_cell_voltage,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/fuel_cell_voltage",buff,0,1,0);
+  esp_mqtt_client_publish(client,"/sensors/fuel_cell_voltage",buff,4,1,0);
 
   memcpy(&buff,&data.super_capacitor_current,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/super_capacitor_current",buff,0,1,0);
+  esp_mqtt_client_publish(client,"/sensors/super_capacitor_current",buff,4,1,0);
 
   memcpy(&buff,&data.super_capacitor_voltage,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/super_capacitor_voltage",buff,0,1,0);
+  esp_mqtt_client_publish(client,"/sensors/super_capacitor_voltage",buff,4,1,0);
 
   memcpy(&buff,&data.vehicle_speed,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/vehicle_speed",buff,0,1,0);
+  esp_mqtt_client_publish(client,"/sensors/vehicle_speed",buff,4,1,0);
 
   memcpy(&buff,&data.fan_rpm,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/fan_rpm",buff,0,1,0);
+  ESP_LOGI(TAG1,"MESS : |%d|%d|%d|%d|",buff[0],buff[1],buff[2],buff[3]);
+  esp_mqtt_client_publish(client,"/sensors/fan_rpm",buff,4,1,0);
 
   memcpy(&buff,&data.fuel_cell_temperature,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/fuel_cell_temperature",buff,0,1,0);
+  esp_mqtt_client_publish(client,"/sensors/fuel_cell_temperature",buff,4,1,0);
 
   memcpy(&buff,&data.hydrogen_pressure,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/hydrogen_pressure",buff,0,1,0);
+  esp_mqtt_client_publish(client,"/sensors/hydrogen_pressure",buff,4,1,0);
 
   memcpy(&buff,&data.motor_current,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/motor_current",buff,0,1,0);
+  esp_mqtt_client_publish(client,"/sensors/motor_current",buff,4,1,0);
   
   char buff2[4]= {data.logic_state,0,0,0}; 
   ESP_LOGI(TAG1,"%s",buff2);
@@ -216,13 +214,12 @@ static void UART_TASK(void *arg){
   uint8_t *rx_data = (uint8_t *) malloc(BUF_SIZE);
   while(1){
     
-    //ESP_LOGI(TAG2, "SIEMA SIEMA UART Pętla WITA");
     int len = uart_read_bytes(uart_num, rx_data, (BUF_SIZE - 1), 20 / portTICK_PERIOD_MS);
     if(len>0){
 
       //ESP_LOGI(TAG2,"%d, BUF: %u, DATA: %u",len,sizeof(rx_data),sizeof(data));
       memcpy(&data,rx_data,sizeof(data));
-      ESP_LOGI(TAG2,"%f",data.fuel_cell_voltage);
+/*      ESP_LOGI(TAG2,"%f",data.fuel_cell_voltage);
       ESP_LOGI(TAG2,"%f",data.fuel_cell_current);
       ESP_LOGI(TAG2,"%f",data.super_capacitor_current);
       ESP_LOGI(TAG2,"%f",data.super_capacitor_voltage);
@@ -233,7 +230,7 @@ static void UART_TASK(void *arg){
       ESP_LOGI(TAG2,"%f",data.motor_current);
       ESP_LOGI(TAG2,"%d",data.error_codes);
       ESP_LOGI(TAG2,"%d",data.logic_state);
-      if(mqtthandle == NULL)xTaskCreatePinnedToCore(send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &mqtthandle,1);
+  */    xTaskCreatePinnedToCore(send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &mqtthandle,1);
 //      if(SDCardHandle == NULL)xTaskCreatePinnedToCore(sd_card_write,"SD_CARD_WRITE",1024*2,NULL,10,&SDCardHandle,1);
     }
   }
