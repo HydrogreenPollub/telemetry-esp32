@@ -24,7 +24,7 @@
 #include "endian.h"
 #define TXD_PIN (GPIO_NUM_17)
 #define RXD_PIN (GPIO_NUM_16)
-#define BUF_SIZE (256)
+#define BUF_SIZE (1024*4)
 
 TaskHandle_t mqtthandle = NULL;
 TaskHandle_t SDCardHandle = NULL;
@@ -189,12 +189,11 @@ void send_data(void *pvParameter){
   vTaskDelete(mqtthandle);
 }
 
-static esp_err_t sd_card_start(){
-}
-static void sd_card_write(void *arg){
-}
-
-
+//static esp_err_t sd_card_start(){
+//}
+//static void sd_card_write(void *arg){
+//}
+//
 static void UART_TASK(void *arg){
   // Configure UART parameters
   const uart_port_t uart_num = UART_NUM_2;
@@ -221,8 +220,19 @@ static void UART_TASK(void *arg){
     int len = uart_read_bytes(uart_num, rx_data, (BUF_SIZE - 1), 20 / portTICK_PERIOD_MS);
     if(len>0){
 
-      ESP_LOGI(TAG2, "SIEMA SIEMA UART warunek WITA");
-      memcpy(&data,&rx_data,sizeof(rx_data));
+      //ESP_LOGI(TAG2,"%d, BUF: %u, DATA: %u",len,sizeof(rx_data),sizeof(data));
+      memcpy(&data,rx_data,sizeof(data));
+      ESP_LOGI(TAG2,"%f",data.fuel_cell_voltage);
+      ESP_LOGI(TAG2,"%f",data.fuel_cell_current);
+      ESP_LOGI(TAG2,"%f",data.super_capacitor_current);
+      ESP_LOGI(TAG2,"%f",data.super_capacitor_voltage);
+      ESP_LOGI(TAG2,"%f",data.vehicle_speed);
+      ESP_LOGI(TAG2,"%f",data.fan_rpm);
+      ESP_LOGI(TAG2,"%f",data.fuel_cell_temperature);
+      ESP_LOGI(TAG2,"%f",data.hydrogen_pressure);
+      ESP_LOGI(TAG2,"%f",data.motor_current);
+      ESP_LOGI(TAG2,"%d",data.error_codes);
+      ESP_LOGI(TAG2,"%d",data.logic_state);
       if(mqtthandle == NULL)xTaskCreatePinnedToCore(send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &mqtthandle,1);
 //      if(SDCardHandle == NULL)xTaskCreatePinnedToCore(sd_card_write,"SD_CARD_WRITE",1024*2,NULL,10,&SDCardHandle,1);
     }
@@ -246,6 +256,6 @@ void app_main(void)
     vTaskDelay(500/portTICK_PERIOD_MS);
   }
   mqtt_app_start();
-//  xTaskCreatePinnedToCore(send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &mqtthandle,1);
+  vTaskDelay(1000/portTICK_PERIOD_MS);
   xTaskCreatePinnedToCore(UART_TASK, "uart_echo_task",1024*4, NULL, 2, NULL,0);
 }
