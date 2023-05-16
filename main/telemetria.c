@@ -16,16 +16,21 @@
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
-#include "driver/sdmmc_host.h"
-#include "driver/sdmmc_defs.h"
-#include "sdmmc_cmd.h"
-#include "esp_vfs_fat.h"
 #include "driver/uart.h"
 #include "endian.h"
+#include <sys/unistd.h>
+#include <sys/stat.h>
+#include "esp_vfs_fat.h"
+#include "sdmmc_cmd.h"
 #define TXD_PIN (GPIO_NUM_17)
 #define RXD_PIN (GPIO_NUM_16)
+#define STS_LED (GPIO_NUM_22)
 #define BUF_SIZE (1024*4)
-
+#define PIN_NUM_MISO  CONFIG_EXAMPLE_PIN_MISO
+#define PIN_NUM_MOSI  CONFIG_EXAMPLE_PIN_MOSI
+#define PIN_NUM_CLK   CONFIG_EXAMPLE_PIN_CLK
+#define PIN_NUM    CONFIG_EXAMPLE_PIN_CS
+#define MOUNT_POINT "/sdcard"
 TaskHandle_t mqtthandle = NULL;
 TaskHandle_t SDCardHandle = NULL;
 static const char *TAG = "WiFi";
@@ -35,29 +40,30 @@ static const char *TAG3 = "SD_CARD";
 bool wifi_ready=0;
 esp_mqtt_client_handle_t client;
 
-struct data {
-  float fuel_cell_voltage;
-  float fuel_cell_current;
-  float super_capacitor_current;
-  float super_capacitor_voltage;
-  float vehicle_speed;
-  float fan_rpm;
-  float fuel_cell_temperature;
-  float hydrogen_pressure;
-  float motor_current;
-  uint8_t error_codes;
+struct data {  
   union {
     struct { // TODO remove bitfield since it won't be used here anyway
+      uint8_t is_emergency:1;
+      uint8_t is_hydrogen_leaking:1;
+      uint8_t is_SC_relay_closed:1;
       uint8_t vehicle_is_speed_button_pressed:1;
       uint8_t vehicle_is_half_speed_button_pressed:1;
-      uint8_t is_emergency:1;
       uint8_t hydrogen_cell_button_state:2; // Split into two variables?
       uint8_t is_super_capacitor_button_pressed:1;
-      uint8_t is_relay_closed:1;
-      uint8_t is_hydrogen_leaking:1;
     };
     uint8_t logic_state;
   };
+  float FC_current;
+  float FC_SC_current;
+  float SC_motor_current;
+  float FC_voltage;
+  float SC_voltage;
+  float Hydrogen_sensor_voltage;
+  float fuel_cell_temperature;
+  uint16_t fan_rpm;
+  float vehicle_speed;
+  uint8_t motor_PWM;
+  float hydrogen_pressure;
 } data;
 
 static void log_error_if_nonzero(const char *message, int error_code)
@@ -151,47 +157,86 @@ static void mqtt_app_start(void)
     esp_mqtt_client_start(client);
 }
 void send_data(void *pvParameter){
-  char buff[4];
-
-  memcpy(&buff,&data.fuel_cell_current,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/fuel_cell_current",buff,4,1,0);
-
-  memcpy(&buff,&data.fuel_cell_voltage,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/fuel_cell_voltage",buff,4,1,0);
-
-  memcpy(&buff,&data.super_capacitor_current,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/super_capacitor_current",buff,4,1,0);
-
-  memcpy(&buff,&data.super_capacitor_voltage,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/super_capacitor_voltage",buff,4,1,0);
-
-  memcpy(&buff,&data.vehicle_speed,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/vehicle_speed",buff,4,1,0);
-
-  memcpy(&buff,&data.fan_rpm,sizeof(float));
-  ESP_LOGI(TAG1,"MESS : |%d|%d|%d|%d|",buff[0],buff[1],buff[2],buff[3]);
-  esp_mqtt_client_publish(client,"/sensors/fan_rpm",buff,4,1,0);
-
-  memcpy(&buff,&data.fuel_cell_temperature,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/fuel_cell_temperature",buff,4,1,0);
-
-  memcpy(&buff,&data.hydrogen_pressure,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/hydrogen_pressure",buff,4,1,0);
-
-  memcpy(&buff,&data.motor_current,sizeof(float));
-  esp_mqtt_client_publish(client,"/sensors/motor_current",buff,4,1,0);
-  
-  char buff2[4]= {data.logic_state,0,0,0}; 
-  ESP_LOGI(TAG1,"%s",buff2);
-  esp_mqtt_client_publish(client,"/logic",buff2,0,1,0);
+  char buff[36];
+  int i;
+  memcpy(&buff,&data,sizeof(data));
+  for (i = 0; i < 36; i++)
+  {
+    if (i > 0) printf(":");
+    printf("%02X ", buff[i]);
+  }
+printf("\n");
+  esp_mqtt_client_publish(client,"/sensors",buff,36,1,0);
   vTaskDelete(mqtthandle);
 }
 
-//static esp_err_t sd_card_start(){
-//}
-//static void sd_card_write(void *arg){
-//}
-//
+static esp_err_t sd_card_start(){
+  esp_err_t ret;
+     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+        .format_if_mount_failed = false,
+        .max_files = 5,
+        .allocation_unit_size = 0
+    };
+    sdmmc_card_t *card;
+    const char mount_point[] = MOUNT_POINT;
+    ESP_LOGI(TAG3, "Initializing SD card");
+    sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+
+    spi_bus_config_t bus_cfg = {
+        .mosi_io_num = CONFIG_PIN_NUM_MOSI,
+        .miso_io_num =  CONFIG_PIN_NUM_MISO,
+        .sclk_io_num =  CONFIG_PIN_NUM_CLK,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+        .max_transfer_sz = 4000,
+    };
+    ret = spi_bus_initialize(host.slot, &bus_cfg, SDSPI_DEFAULT_DMA);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize bus.");
+        return ret;
+    }
+
+    // This initializes the slot without card detect (CD) and write protect (WP) signals.
+    // Modify slot_config.gpio_cd and slot_config.gpio_wp if your board has these signals.
+    sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
+    slot_config.gpio_cs = CONFIG_PIN_NUM_CS;
+    slot_config.host_id = host.slot;
+
+    ESP_LOGI(TAG, "Mounting filesystem");
+    ret = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
+
+    if (ret != ESP_OK) {
+        if (ret == ESP_FAIL) {
+            ESP_LOGE(TAG, "Failed to mount filesystem. "
+                     "If you want the card to be formatted, set the CONFIG_EXAMPLE_FORMAT_IF_MOUNT_FAILED menuconfig option.");
+        } else {
+            ESP_LOGE(TAG, "Failed to initialize the card (%s). "
+                     "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(ret));
+        }
+        return ret;
+    }
+    ESP_LOGI(TAG, "Filesystem mounted");
+
+    // Card has been initialized, print its properties
+    sdmmc_card_print_info(stdout, card);
+}
+    // Use POSIX and C standard library functions to work with files.
+
+static void sd_card_write(void *arg){
+  const char *file_path = MOUNT_POINT"/SD_data.txt";
+  ESP_LOGI(TAG, "Opening file %s", MOUNT_POINT);
+  FILE *f = fopen(file_path, "a");
+  if (f == NULL) {
+      ESP_LOGE(TAG, "Failed to open file for writing");
+      return;
+  }
+  char* data;
+  for(int i = 0;i<10;i++);
+  fprintf(f, data);
+  fclose(f);
+  ESP_LOGI(TAG, "File written");
+}
+
 static void UART_TASK(void *arg){
   // Configure UART parameters
   const uart_port_t uart_num = UART_NUM_2;
@@ -237,7 +282,11 @@ static void UART_TASK(void *arg){
 }
 
 void app_main(void)
-{
+{    
+
+  gpio_reset_pin(STS_LED);
+  /* Set the GPIO as a push/pull output */
+  gpio_set_direction(STS_LED, GPIO_MODE_OUTPUT);
   // POTRZEBNE?
   esp_log_level_set("*", ESP_LOG_INFO);
   esp_log_level_set("mqtt_client", ESP_LOG_VERBOSE);
@@ -247,11 +296,15 @@ void app_main(void)
   esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
   esp_log_level_set("outbox", ESP_LOG_VERBOSE);
   // ?????????????
+  int rep = 0;
   wifi_connection();
   while(!wifi_ready){
     ESP_LOGI(TAG,"Connecting to WIFI");
     vTaskDelay(500/portTICK_PERIOD_MS);
+    rep++;
+    if(rep == 5 ) esp_restart();
   }
+ gpio_set_level(STS_LED, 255);
   mqtt_app_start();
   vTaskDelay(1000/portTICK_PERIOD_MS);
   xTaskCreatePinnedToCore(UART_TASK, "uart_echo_task",1024*4, NULL, 2, NULL,0);
