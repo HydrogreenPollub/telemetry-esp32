@@ -6,6 +6,7 @@
 #include "esp_netif_types.h"
 #include "esp_wifi_types.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/portmacro.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
@@ -33,6 +34,8 @@
 #define MOUNT_POINT "/sdcard"
 TaskHandle_t mqtthandle = NULL;
 TaskHandle_t SDCardHandle = NULL;
+TaskHandle_t UART = NULL;
+SemaphoreHandle_t Semaphore = NULL;
 static const char *TAG = "WiFi";
 static const char *TAG1 = "MQTT";
 static const char *TAG2 = "UART";
@@ -157,16 +160,16 @@ static void mqtt_app_start(void)
     esp_mqtt_client_start(client);
 }
 void send_data(void *pvParameter){
-  char buff[36];
+  char buff[sizeof(data)];
   int i;
   memcpy(&buff,&data,sizeof(data));
-  for (i = 0; i < 36; i++)
+  for (i = 0; i < sizeof(data); i++)
   {
     if (i > 0) printf(":");
     printf("%02X ", buff[i]);
   }
 printf("\n");
-  esp_mqtt_client_publish(client,"/sensors",buff,36,1,0);
+  esp_mqtt_client_publish(client,"/sensors",buff,sizeof(data),1,0);
   vTaskDelete(mqtthandle);
 }
 
@@ -195,9 +198,6 @@ static esp_err_t sd_card_start(){
         ESP_LOGE(TAG, "Failed to initialize bus.");
         return ret;
     }
-
-    // This initializes the slot without card detect (CD) and write protect (WP) signals.
-    // Modify slot_config.gpio_cd and slot_config.gpio_wp if your board has these signals.
     sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
     slot_config.gpio_cs = CONFIG_PIN_NUM_CS;
     slot_config.host_id = host.slot;
@@ -207,11 +207,9 @@ static esp_err_t sd_card_start(){
 
     if (ret != ESP_OK) {
         if (ret == ESP_FAIL) {
-            ESP_LOGE(TAG, "Failed to mount filesystem. "
-                     "If you want the card to be formatted, set the CONFIG_EXAMPLE_FORMAT_IF_MOUNT_FAILED menuconfig option.");
+            ESP_LOGE(TAG, "Failed to mount filesystem. ");
         } else {
-            ESP_LOGE(TAG, "Failed to initialize the card (%s). "
-                     "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(ret));
+            ESP_LOGE(TAG, "Failed to initialize the card (%s). ", esp_err_to_name(ret));
         }
         return ret;
     }
@@ -219,8 +217,8 @@ static esp_err_t sd_card_start(){
 
     // Card has been initialized, print its properties
     sdmmc_card_print_info(stdout, card);
+  return ret;
 }
-    // Use POSIX and C standard library functions to work with files.
 
 static void sd_card_write(void *arg){
   const char *file_path = MOUNT_POINT"/SD_data.txt";
@@ -230,11 +228,57 @@ static void sd_card_write(void *arg){
       ESP_LOGE(TAG, "Failed to open file for writing");
       return;
   }
-  char* data;
-  for(int i = 0;i<10;i++);
-  fprintf(f, data);
+  
+  char data_to_write[5] = {0,0,0,0,44};
+  memcpy(data_to_write,&data.logic_state,sizeof(float));
+  fprintf(f, &data_to_write);
+  fprintf(f,",");
+  memcpy(data_to_write,&data.FC_current,sizeof(float));
+  fprintf(f, &data_to_write);
+  
+  fprintf(f,",");
+  memcpy(data_to_write,&data.FC_SC_current,sizeof(float));
+  fprintf(f, &data_to_write);
+  
+  fprintf(f,",");
+  memcpy(data_to_write,&data.SC_motor_current,sizeof(float));
+  fprintf(f, &data_to_write);
+  
+  fprintf(f,",");
+  memcpy(data_to_write,&data.FC_voltage,sizeof(float));
+  fprintf(f, &data_to_write);
+  
+  fprintf(f,",");
+  memcpy(data_to_write,&data.SC_voltage,sizeof(float));
+  fprintf(f, &data_to_write);
+  
+  fprintf(f,",");
+  memcpy(data_to_write,&data.Hydrogen_sensor_voltage,sizeof(float));
+  fprintf(f, &data_to_write);
+  
+  fprintf(f,",");
+  memcpy(data_to_write,&data.fuel_cell_temperature,sizeof(float));
+  fprintf(f, &data_to_write);
+  
+  fprintf(f,",");
+  memcpy(data_to_write,&data.fan_rpm,sizeof(float));
+  fprintf(f, &data_to_write);
+  
+  fprintf(f,",");
+  memcpy(data_to_write,&data.vehicle_speed,sizeof(float));
+  fprintf(f, &data_to_write);
+  
+  fprintf(f,",");
+  memcpy(data_to_write,&data.motor_PWM,sizeof(float));
+  fprintf(f, &data_to_write);
+
+  fprintf(f,",");
+  memcpy(data_to_write,&data.hydrogen_pressure,sizeof(float));
+  fprintf(f, &data_to_write);
+  fprintf(f,"\n");
   fclose(f);
   ESP_LOGI(TAG, "File written");
+  vTaskDelete(SDCardHandle);
 }
 
 static void UART_TASK(void *arg){
@@ -276,16 +320,15 @@ static void UART_TASK(void *arg){
       ESP_LOGI(TAG2,"%d",data.error_codes);
       ESP_LOGI(TAG2,"%d",data.logic_state);
   */    xTaskCreatePinnedToCore(send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &mqtthandle,1);
-//      if(SDCardHandle == NULL)xTaskCreatePinnedToCore(sd_card_write,"SD_CARD_WRITE",1024*2,NULL,10,&SDCardHandle,1);
+        xTaskCreatePinnedToCore(sd_card_write,"SD_CARD_WRITE",1024*2,NULL,10,&SDCardHandle,1);
+        }
     }
   }
-}
+
 
 void app_main(void)
 {    
-
-  gpio_reset_pin(STS_LED);
-  /* Set the GPIO as a push/pull output */
+gpio_reset_pin(STS_LED);
   gpio_set_direction(STS_LED, GPIO_MODE_OUTPUT);
   // POTRZEBNE?
   esp_log_level_set("*", ESP_LOG_INFO);
@@ -295,17 +338,18 @@ void app_main(void)
   esp_log_level_set("esp-tls", ESP_LOG_VERBOSE);
   esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
   esp_log_level_set("outbox", ESP_LOG_VERBOSE);
-  // ?????????????
+  // ?????????????  
   int rep = 0;
   wifi_connection();
   while(!wifi_ready){
     ESP_LOGI(TAG,"Connecting to WIFI");
     vTaskDelay(500/portTICK_PERIOD_MS);
     rep++;
-    if(rep == 5 ) esp_restart();
+    if(rep == 5 ){ ESP_LOGI(TAG,"SUICIDE"); esp_restart();}
   }
  gpio_set_level(STS_LED, 255);
   mqtt_app_start();
   vTaskDelay(1000/portTICK_PERIOD_MS);
-  xTaskCreatePinnedToCore(UART_TASK, "uart_echo_task",1024*4, NULL, 2, NULL,0);
+  sd_card_start();
+  xTaskCreatePinnedToCore(UART_TASK, "uart_echo_task",1024*4, NULL, 2,&UART,0);
 }
