@@ -228,54 +228,48 @@ static void sd_card_write(void *arg){
       ESP_LOGE(TAG, "Failed to open file for writing");
       return;
   }
-  
+  fprintf(f,"%hhu,%f,%f,%f,%f,%f,%f,%f,%hu,%f,%hhu,%f\n",data.logic_state,data.FC_current,data.FC_SC_current,data.SC_motor_current,
+          data.FC_voltage,data.SC_voltage,data.Hydrogen_sensor_voltage,data.fuel_cell_temperature,
+          data.fan_rpm,data.vehicle_speed,data.motor_PWM,data.hydrogen_pressure);
+/*  
   char data_to_write[5] = {0,0,0,0,44};
   memcpy(data_to_write,&data.logic_state,sizeof(float));
   fprintf(f, &data_to_write);
-  fprintf(f,",");
+
   memcpy(data_to_write,&data.FC_current,sizeof(float));
   fprintf(f, &data_to_write);
   
-  fprintf(f,",");
   memcpy(data_to_write,&data.FC_SC_current,sizeof(float));
   fprintf(f, &data_to_write);
   
-  fprintf(f,",");
   memcpy(data_to_write,&data.SC_motor_current,sizeof(float));
   fprintf(f, &data_to_write);
   
-  fprintf(f,",");
   memcpy(data_to_write,&data.FC_voltage,sizeof(float));
   fprintf(f, &data_to_write);
   
-  fprintf(f,",");
   memcpy(data_to_write,&data.SC_voltage,sizeof(float));
   fprintf(f, &data_to_write);
   
-  fprintf(f,",");
   memcpy(data_to_write,&data.Hydrogen_sensor_voltage,sizeof(float));
   fprintf(f, &data_to_write);
   
-  fprintf(f,",");
   memcpy(data_to_write,&data.fuel_cell_temperature,sizeof(float));
   fprintf(f, &data_to_write);
   
-  fprintf(f,",");
   memcpy(data_to_write,&data.fan_rpm,sizeof(float));
   fprintf(f, &data_to_write);
   
-  fprintf(f,",");
   memcpy(data_to_write,&data.vehicle_speed,sizeof(float));
   fprintf(f, &data_to_write);
   
-  fprintf(f,",");
   memcpy(data_to_write,&data.motor_PWM,sizeof(float));
   fprintf(f, &data_to_write);
 
-  fprintf(f,",");
   memcpy(data_to_write,&data.hydrogen_pressure,sizeof(float));
   fprintf(f, &data_to_write);
   fprintf(f,"\n");
+  */
   fclose(f);
   ESP_LOGI(TAG, "File written");
   vTaskDelete(SDCardHandle);
