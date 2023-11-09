@@ -26,11 +26,11 @@
 #define TXD_PIN (GPIO_NUM_17)
 #define RXD_PIN (GPIO_NUM_16)
 #define STS_LED (GPIO_NUM_22)
-#define BUF_SIZE (1024*4)
-#define PIN_NUM_MISO  CONFIG_EXAMPLE_PIN_MISO
-#define PIN_NUM_MOSI  CONFIG_EXAMPLE_PIN_MOSI
-#define PIN_NUM_CLK   CONFIG_EXAMPLE_PIN_CLK
-#define PIN_NUM    CONFIG_EXAMPLE_PIN_CS
+#define BUF_SIZE (127)
+#define PIN_NUM_MISO  19
+#define PIN_NUM_MOSI  23
+#define PIN_NUM_CLK   18
+#define PIN_NUM_CS       5
 #define MOUNT_POINT "/sdcard"
 TaskHandle_t mqtthandle = NULL;
 TaskHandle_t SDCardHandle = NULL;
@@ -54,19 +54,19 @@ struct data {
       uint8_t hydrogen_cell_button_state:2; // Split into two variables?
       uint8_t is_super_capacitor_button_pressed:1;
     };
-    uint8_t logic_state;
+    uint8_t logic_state; // 4b
   };
-  float FC_current;
-  float FC_SC_current;
-  float SC_motor_current;
-  float FC_voltage;
-  float SC_voltage;
-  float Hydrogen_sensor_voltage;
-  float fuel_cell_temperature;
-  uint16_t fan_rpm;
-  float vehicle_speed;
-  uint8_t motor_PWM;
-  float hydrogen_pressure;
+  float FC_current; // 8b
+  float FC_SC_current; // 12b
+  float SC_motor_current; // 16b
+  float FC_voltage; // 20b
+  float SC_voltage; // 24b
+  float Hydrogen_sensor_voltage; // 28b
+  float fuel_cell_temperature; // 32b
+  uint16_t fan_rpm; // 36b
+  float vehicle_speed; // 40b
+  uint8_t motor_PWM; // 44b
+  float hydrogen_pressure; //48b
 } data;
 
 static void log_error_if_nonzero(const char *message, int error_code)
@@ -160,15 +160,19 @@ static void mqtt_app_start(void)
     esp_mqtt_client_start(client);
 }
 void send_data(void *pvParameter){
-  char buff[sizeof(data)];
+  //char buff[sizeof(data)];
+  char buff[42];
   int i;
-  memcpy(&buff,&data,sizeof(data));
+  memcpy(&buff,&data,42);
   for (i = 0; i < sizeof(data); i++)
   {
-    if (i > 0) printf(":");
-    printf("%02X ", buff[i]);
+    // if (i > 0) printf(":");
+    // printf("%02X ", buff[i]);
   }
-printf("\n");
+  //printf("\n");
+  printf("Frame length: %d \n", sizeof(data));
+  printf("Buffer length: %d \n", sizeof(buff));
+  ESP_LOG_BUFFER_HEXDUMP(TAG2, buff, sizeof(data), 3);
   esp_mqtt_client_publish(client,"/sensors",buff,sizeof(data),1,0);
   vTaskDelete(mqtthandle);
 }
@@ -186,9 +190,9 @@ static esp_err_t sd_card_start(){
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
 
     spi_bus_config_t bus_cfg = {
-        .mosi_io_num = CONFIG_PIN_NUM_MOSI,
-        .miso_io_num =  CONFIG_PIN_NUM_MISO,
-        .sclk_io_num =  CONFIG_PIN_NUM_CLK,
+        .mosi_io_num = PIN_NUM_MOSI,
+        .miso_io_num = PIN_NUM_MISO,
+        .sclk_io_num = PIN_NUM_CLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
         .max_transfer_sz = 4000,
@@ -199,7 +203,7 @@ static esp_err_t sd_card_start(){
         return ret;
     }
     sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
-    slot_config.gpio_cs = CONFIG_PIN_NUM_CS;
+    slot_config.gpio_cs = PIN_NUM_CS;
     slot_config.host_id = host.slot;
 
     ESP_LOGI(TAG, "Mounting filesystem");
@@ -276,49 +280,47 @@ static void sd_card_write(void *arg){
 }
 
 static void UART_TASK(void *arg){
-  // Configure UART parameters
+
   const uart_port_t uart_num = UART_NUM_2;
   uart_config_t uart_config = {
     .baud_rate = 115200,
     .data_bits = UART_DATA_8_BITS,
     .parity = UART_PARITY_DISABLE,
     .stop_bits = UART_STOP_BITS_1,
+    .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
     .source_clk = UART_SCLK_DEFAULT,
   };
-  // Set UART log level
-  ESP_LOGI(TAG2, "Start RS485 application configure UART.");
-   // Install UART driver
-  ESP_ERROR_CHECK(uart_driver_install(uart_num,BUF_SIZE, 0, 0, NULL, 0));
-  // Configure UART parameters
+
+  ESP_LOGI(TAG2, "Start UART & RS485 application configuration.");
+  ESP_ERROR_CHECK(uart_driver_install(uart_num, BUF_SIZE * 2, 0, 0, NULL, 0));
   ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
-  ESP_LOGI(TAG, "UART set pins, mode and install driver.");
-  //configure UART Pins
   ESP_ERROR_CHECK(uart_set_pin(uart_num, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+
+  ESP_ERROR_CHECK(uart_set_mode(uart_num, UART_MODE_RS485_HALF_DUPLEX));
+  ESP_ERROR_CHECK(uart_set_rx_timeout(uart_num, 3));
+
   uint8_t *rx_data = (uint8_t *) malloc(BUF_SIZE);
   while(1){
-    
-    int len = uart_read_bytes(uart_num, rx_data, (BUF_SIZE - 1), 20 / portTICK_PERIOD_MS);
-    if(len>0){
 
-      //ESP_LOGI(TAG2,"%d, BUF: %u, DATA: %u",len,sizeof(rx_data),sizeof(data));
-      memcpy(&data,rx_data,sizeof(data));
-/*      ESP_LOGI(TAG2,"%f",data.fuel_cell_voltage);
-      ESP_LOGI(TAG2,"%f",data.fuel_cell_current);
-      ESP_LOGI(TAG2,"%f",data.super_capacitor_current);
-      ESP_LOGI(TAG2,"%f",data.super_capacitor_voltage);
-      ESP_LOGI(TAG2,"%f",data.vehicle_speed);
-      ESP_LOGI(TAG2,"%f",data.fan_rpm);
-      ESP_LOGI(TAG2,"%f",data.fuel_cell_temperature);
-      ESP_LOGI(TAG2,"%f",data.hydrogen_pressure);
-      ESP_LOGI(TAG2,"%f",data.motor_current);
-      ESP_LOGI(TAG2,"%d",data.error_codes);
-      ESP_LOGI(TAG2,"%d",data.logic_state);
-  */    xTaskCreatePinnedToCore(send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &mqtthandle,1);
-        xTaskCreatePinnedToCore(sd_card_write,"SD_CARD_WRITE",1024*2,NULL,10,&SDCardHandle,1);
-        }
+    int len = uart_read_bytes(uart_num, rx_data, BUF_SIZE, 100 / portTICK_PERIOD_MS);
+
+    if (len > 0) {
+
+      memcpy(&data, rx_data, sizeof(data));
+      printf("Frame length: %d \n", sizeof(data));
+      printf("Buffer length: %d \n", sizeof(rx_data));
+      
+      ESP_LOGI(TAG2, "%hhu,%f,%f,%f,%f,%f,%f,%f,%hu,%f,%hhu,%f\n", data.logic_state, data.FC_current, data.FC_SC_current, data.SC_motor_current,
+          data.FC_voltage, data.SC_voltage, data.Hydrogen_sensor_voltage, data.fuel_cell_temperature,
+          data.fan_rpm, data.vehicle_speed, data.motor_PWM, data.hydrogen_pressure);
+      
+      ESP_LOG_BUFFER_HEXDUMP(TAG2, rx_data, sizeof(rx_data), 2);
+
+      xTaskCreatePinnedToCore(send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &mqtthandle,1);
+      //xTaskCreatePinnedToCore(sd_card_write,"SD_CARD_WRITE",1024*2,NULL,10,&SDCardHandle,1);
     }
   }
-
+}
 
 void app_main(void)
 {    
@@ -344,6 +346,6 @@ gpio_reset_pin(STS_LED);
  gpio_set_level(STS_LED, 255);
   mqtt_app_start();
   vTaskDelay(1000/portTICK_PERIOD_MS);
-  sd_card_start();
+  //sd_card_start();
   xTaskCreatePinnedToCore(UART_TASK, "uart_echo_task",1024*4, NULL, 2,&UART,0);
 }
