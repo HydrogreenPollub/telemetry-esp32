@@ -32,5 +32,44 @@ menu "Project Configuration"
         int "MQTT PORT"
         default 1883
         help 
-            MQTT PORT SELECTED 
+            MQTT PORT SELECTED
+
+
+    config TXD_PIN
+        int "TXD PIN NUMBER"
+        default 17
+        
+    config RXD_PIN
+        int "RXD PIN NUMBER"
+        default 16
+        
+
+    config STS_LED
+        int "STS LED PIN"
+        default 22
+        
+    config BUF_SIZE
+        int "BUFFER SIZE"
+        default 127
+        
+    config PIN_NUM_MISO
+        int "MISO pin number"
+        default 19
+        
+    config PIN_NUM_MOSI
+        int "MOSI pin number"
+        default 23
+        
+    config PIN_NUM_CLK
+        int "CLK pin number"
+        default 18
+        
+    config PIN_NUM_CS
+        int "CS pin number"
+        default 5
+        
+    config MOUNT_POINT
+        string "sdcard mount point"
+        default "/sdcard"
+        
 endmenu

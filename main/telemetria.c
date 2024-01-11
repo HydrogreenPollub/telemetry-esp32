@@ -23,19 +23,11 @@
 #include <sys/stat.h>
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
-#define TXD_PIN (GPIO_NUM_17)
-#define RXD_PIN (GPIO_NUM_16)
-#define STS_LED (GPIO_NUM_22)
-#define BUF_SIZE (127)
-#define PIN_NUM_MISO  19
-#define PIN_NUM_MOSI  23
-#define PIN_NUM_CLK   18
-#define PIN_NUM_CS       5
-#define MOUNT_POINT "/sdcard"
-TaskHandle_t mqtthandle = NULL;
-TaskHandle_t SDCardHandle = NULL;
-TaskHandle_t UART = NULL;
-SemaphoreHandle_t Semaphore = NULL;
+
+TaskHandle_t mqtt_handle = NULL;
+TaskHandle_t handle_SD_Card = NULL;
+TaskHandle_t uart = NULL;
+// SemaphoreHandle_t semaphore = NULL;  ///do wywalenia
 static const char *TAG = "WiFi";
 static const char *TAG1 = "MQTT";
 static const char *TAG2 = "UART";
@@ -48,7 +40,7 @@ struct data {
     struct { // TODO remove bitfield since it won't be used here anyway
       uint8_t is_emergency:1;
       uint8_t is_hydrogen_leaking:1;
-      uint8_t is_SC_relay_closed:1;
+      uint8_t is_sc_relay_closed:1;
       uint8_t vehicle_is_speed_button_pressed:1;
       uint8_t vehicle_is_half_speed_button_pressed:1;
       uint8_t hydrogen_cell_button_state:2; // Split into two variables?
@@ -56,16 +48,16 @@ struct data {
     };
     uint8_t logic_state; // 4b
   };
-  float FC_current; // 8b
-  float FC_SC_current; // 12b
-  float SC_motor_current; // 16b
-  float FC_voltage; // 20b
-  float SC_voltage; // 24b
-  float Hydrogen_sensor_voltage; // 28b
+  float fc_current; // 8b
+  float fc_sc_current; // 12b
+  float sc_motor_current; // 16b
+  float fc_voltage; // 20b
+  float sc_voltage; // 24b
+  float hydrogen_sensor_voltage; // 28b
   float fuel_cell_temperature; // 32b
   uint16_t fan_rpm; // 36b
   float vehicle_speed; // 40b
-  uint8_t motor_PWM; // 44b
+  uint8_t motor_pwm; // 44b
   float hydrogen_pressure; //48b
 } data;
 
@@ -174,7 +166,7 @@ void send_data(void *pvParameter){
   printf("Buffer length: %d \n", sizeof(buff));
   ESP_LOG_BUFFER_HEXDUMP(TAG2, buff, sizeof(data), 3);
   esp_mqtt_client_publish(client,"/sensors",buff,sizeof(data),1,0);
-  vTaskDelete(mqtthandle);
+  vTaskDelete(mqtt_handle);
 }
 
 static esp_err_t sd_card_start(){
@@ -185,14 +177,14 @@ static esp_err_t sd_card_start(){
         .allocation_unit_size = 0
     };
     sdmmc_card_t *card;
-    const char mount_point[] = MOUNT_POINT;
+    const char mount_point[] = CONFIG_MOUNT_POINT;
     ESP_LOGI(TAG3, "Initializing SD card");
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
 
     spi_bus_config_t bus_cfg = {
-        .mosi_io_num = PIN_NUM_MOSI,
-        .miso_io_num = PIN_NUM_MISO,
-        .sclk_io_num = PIN_NUM_CLK,
+        .mosi_io_num = CONFIG_PIN_NUM_MOSI,
+        .miso_io_num = CONFIG_PIN_NUM_MISO,
+        .sclk_io_num = CONFIG_PIN_NUM_CLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
         .max_transfer_sz = 4000,
@@ -203,7 +195,7 @@ static esp_err_t sd_card_start(){
         return ret;
     }
     sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
-    slot_config.gpio_cs = PIN_NUM_CS;
+    slot_config.gpio_cs = CONFIG_PIN_NUM_CS;
     slot_config.host_id = host.slot;
 
     ESP_LOGI(TAG, "Mounting filesystem");
@@ -225,58 +217,20 @@ static esp_err_t sd_card_start(){
 }
 
 static void sd_card_write(void *arg){
-  const char *file_path = MOUNT_POINT"/SD_data.txt";
-  ESP_LOGI(TAG, "Opening file %s", MOUNT_POINT);
+  const char *file_path = CONFIG_MOUNT_POINT"/SD_data.txt";
+  ESP_LOGI(TAG, "Opening file %s", CONFIG_MOUNT_POINT);
   FILE *f = fopen(file_path, "a");
   if (f == NULL) {
       ESP_LOGE(TAG, "Failed to open file for writing");
       return;
   }
-  fprintf(f,"%hhu,%f,%f,%f,%f,%f,%f,%f,%hu,%f,%hhu,%f\n",data.logic_state,data.FC_current,data.FC_SC_current,data.SC_motor_current,
-          data.FC_voltage,data.SC_voltage,data.Hydrogen_sensor_voltage,data.fuel_cell_temperature,
-          data.fan_rpm,data.vehicle_speed,data.motor_PWM,data.hydrogen_pressure);
-/*  
-  char data_to_write[5] = {0,0,0,0,44};
-  memcpy(data_to_write,&data.logic_state,sizeof(float));
-  fprintf(f, &data_to_write);
+  fprintf(f,"%hhu,%f,%f,%f,%f,%f,%f,%f,%hu,%f,%hhu,%f\n",data.logic_state,data.fc_current,data.fc_sc_current,data.sc_motor_current,
+          data.fc_voltage,data.sc_voltage,data.hydrogen_sensor_voltage,data.fuel_cell_temperature,
+          data.fan_rpm,data.vehicle_speed,data.motor_pwm,data.hydrogen_pressure);
 
-  memcpy(data_to_write,&data.FC_current,sizeof(float));
-  fprintf(f, &data_to_write);
-  
-  memcpy(data_to_write,&data.FC_SC_current,sizeof(float));
-  fprintf(f, &data_to_write);
-  
-  memcpy(data_to_write,&data.SC_motor_current,sizeof(float));
-  fprintf(f, &data_to_write);
-  
-  memcpy(data_to_write,&data.FC_voltage,sizeof(float));
-  fprintf(f, &data_to_write);
-  
-  memcpy(data_to_write,&data.SC_voltage,sizeof(float));
-  fprintf(f, &data_to_write);
-  
-  memcpy(data_to_write,&data.Hydrogen_sensor_voltage,sizeof(float));
-  fprintf(f, &data_to_write);
-  
-  memcpy(data_to_write,&data.fuel_cell_temperature,sizeof(float));
-  fprintf(f, &data_to_write);
-  
-  memcpy(data_to_write,&data.fan_rpm,sizeof(float));
-  fprintf(f, &data_to_write);
-  
-  memcpy(data_to_write,&data.vehicle_speed,sizeof(float));
-  fprintf(f, &data_to_write);
-  
-  memcpy(data_to_write,&data.motor_PWM,sizeof(float));
-  fprintf(f, &data_to_write);
-
-  memcpy(data_to_write,&data.hydrogen_pressure,sizeof(float));
-  fprintf(f, &data_to_write);
-  fprintf(f,"\n");
-  */
   fclose(f);
   ESP_LOGI(TAG, "File written");
-  vTaskDelete(SDCardHandle);
+  vTaskDelete(handle_SD_Card);
 }
 
 static void UART_TASK(void *arg){
@@ -292,17 +246,17 @@ static void UART_TASK(void *arg){
   };
 
   ESP_LOGI(TAG2, "Start UART & RS485 application configuration.");
-  ESP_ERROR_CHECK(uart_driver_install(uart_num, BUF_SIZE * 2, 0, 0, NULL, 0));
+  ESP_ERROR_CHECK(uart_driver_install(uart_num, CONFIG_BUF_SIZE * 2, 0, 0, NULL, 0));
   ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
-  ESP_ERROR_CHECK(uart_set_pin(uart_num, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+  ESP_ERROR_CHECK(uart_set_pin(uart_num, CONFIG_TXD_PIN, CONFIG_RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
   ESP_ERROR_CHECK(uart_set_mode(uart_num, UART_MODE_RS485_HALF_DUPLEX));
   ESP_ERROR_CHECK(uart_set_rx_timeout(uart_num, 3));
 
-  uint8_t *rx_data = (uint8_t *) malloc(BUF_SIZE);
+  uint8_t *rx_data = (uint8_t *) malloc(CONFIG_BUF_SIZE);
   while(1){
 
-    int len = uart_read_bytes(uart_num, rx_data, BUF_SIZE, 100 / portTICK_PERIOD_MS);
+    int len = uart_read_bytes(uart_num, rx_data, CONFIG_BUF_SIZE, 100 / portTICK_PERIOD_MS);
 
     if (len > 0) {
 
@@ -310,22 +264,22 @@ static void UART_TASK(void *arg){
       printf("Frame length: %d \n", sizeof(data));
       printf("Buffer length: %d \n", sizeof(rx_data));
       
-      ESP_LOGI(TAG2, "%hhu,%f,%f,%f,%f,%f,%f,%f,%hu,%f,%hhu,%f\n", data.logic_state, data.FC_current, data.FC_SC_current, data.SC_motor_current,
-          data.FC_voltage, data.SC_voltage, data.Hydrogen_sensor_voltage, data.fuel_cell_temperature,
-          data.fan_rpm, data.vehicle_speed, data.motor_PWM, data.hydrogen_pressure);
+      ESP_LOGI(TAG2, "%hhu,%f,%f,%f,%f,%f,%f,%f,%hu,%f,%hhu,%f\n", data.logic_state, data.fc_current, data.fc_sc_current, data.sc_motor_current,
+          data.fc_voltage, data.sc_voltage, data.hydrogen_sensor_voltage, data.fuel_cell_temperature,
+          data.fan_rpm, data.vehicle_speed, data.motor_pwm, data.hydrogen_pressure);
       
       ESP_LOG_BUFFER_HEXDUMP(TAG2, rx_data, sizeof(rx_data), 2);
 
-      xTaskCreatePinnedToCore(send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &mqtthandle,1);
-      //xTaskCreatePinnedToCore(sd_card_write,"SD_CARD_WRITE",1024*2,NULL,10,&SDCardHandle,1);
+      xTaskCreatePinnedToCore(send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &mqtt_handle,1);
+      //xTaskCreatePinnedToCore(sd_card_write,"SD_CARD_WRITE",1024*2,NULL,10,&handle_SD_Card,1);
     }
   }
 }
 
 void app_main(void)
 {    
-gpio_reset_pin(STS_LED);
-  gpio_set_direction(STS_LED, GPIO_MODE_OUTPUT);
+gpio_reset_pin(CONFIG_STS_LED);
+  gpio_set_direction(CONFIG_STS_LED, GPIO_MODE_OUTPUT);
   // POTRZEBNE?
   esp_log_level_set("*", ESP_LOG_INFO);
   esp_log_level_set("mqtt_client", ESP_LOG_VERBOSE);
@@ -343,9 +297,9 @@ gpio_reset_pin(STS_LED);
     rep++;
     if(rep == 5 ){ ESP_LOGI(TAG,"SUICIDE"); esp_restart();}
   }
- gpio_set_level(STS_LED, 255);
+ gpio_set_level(CONFIG_STS_LED, 255);
   mqtt_app_start();
   vTaskDelay(1000/portTICK_PERIOD_MS);
   //sd_card_start();
-  xTaskCreatePinnedToCore(UART_TASK, "uart_echo_task",1024*4, NULL, 2,&UART,0);
+  xTaskCreatePinnedToCore(UART_TASK, "uart_echo_task",1024*4, NULL, 2,&uart,0);
 }
