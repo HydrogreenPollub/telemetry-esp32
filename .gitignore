@@ -5,3 +5,4 @@ sdkconfig.old
 sdkconfig
 .project
 .cache/
+.vscode/
