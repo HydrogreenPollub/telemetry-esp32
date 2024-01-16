@@ -71,5 +71,12 @@ menu "Project Configuration"
     config MOUNT_POINT
         string "sdcard mount point"
         default "/sdcard"
+
+    config UART_NUM
+        int "uart number"
+        default 2
+    config UART_BAUD_RATE
+        int "baud rate for uart"
+        default 115200
         
 endmenu

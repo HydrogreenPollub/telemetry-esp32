@@ -101,7 +101,7 @@ static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_b
   }
 }
 
-void wifi_connection(){
+void wifi_init(){
   nvs_flash_init(); //non volatile memory initialization
   esp_netif_init();//
   esp_event_loop_create_default();
@@ -118,15 +118,17 @@ void wifi_connection(){
     }};
   esp_wifi_set_mode(WIFI_MODE_STA);
   esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration);
+  
+}
+
+void wifi_start(){
   esp_wifi_start();
   esp_wifi_connect();
 }
 
 
-
-
 /////////////mqtt section
-static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+static void mqtt_logs(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
   ESP_LOGD(TAG_MQTT, "Event dispatched from event loop base=%s, event_id=%" PRIi32 "", base, event_id);
   esp_mqtt_event_handle_t event = event_data;
@@ -142,6 +144,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
       
     case MQTT_EVENT_PUBLISHED:
       ESP_LOGI(TAG_MQTT, "MQTT_SENT");
+      break;
     case MQTT_EVENT_ERROR:
       ESP_LOGI(TAG_MQTT, "MQTT_EVENT ERROR CODE, error_code=%d", event->error_handle->error_type);
       if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
@@ -158,7 +161,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
   }
 }
 
-static void mqtt_app_start(void) 
+static void mqtt_init(void) 
 {
   esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.hostname =  CONFIG_MQTT_HOSTNAME,
@@ -166,13 +169,17 @@ static void mqtt_app_start(void)
         .broker.address.port = CONFIG_MQTT_PORT,
         .credentials.username = CONFIG_MQTT_USERNAME,
         .credentials.authentication.password = CONFIG_MQTT_PASSWD
-        
     };
    handle_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
-    esp_mqtt_client_register_event(handle_mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+}
+
+static void mqtt_start(){
+    esp_mqtt_client_register_event(handle_mqtt_client, ESP_EVENT_ANY_ID, mqtt_logs, NULL);
     esp_mqtt_client_start(handle_mqtt_client);
 }
-void send_data(void *pvParameter){
+
+
+void mqtt_send_data(void *pvParameter){
   //char buff[sizeof(data)];
   char buff[42];
   int i;
@@ -194,7 +201,7 @@ void send_data(void *pvParameter){
 
 
 /////////////sdcard section
-static esp_err_t sd_card_start(){
+static esp_err_t sd_card_init(){
   esp_err_t ret;
      esp_vfs_fat_sdmmc_mount_config_t mount_config = {
         .format_if_mount_failed = false,
@@ -263,11 +270,37 @@ static void sd_card_write(void *arg){
 
 
 ///////////// UART section
-static void UART_TASK(void *arg){
+
+void uart_start(){
+  uint8_t *rx_data = (uint8_t *) malloc(CONFIG_BUF_SIZE);
+  while(1){
+
+    int len = uart_read_bytes(CONFIG_UART_NUM, rx_data, CONFIG_BUF_SIZE, 100 / portTICK_PERIOD_MS);
+
+    if (len > 0) {
+
+      memcpy(&data, rx_data, sizeof(data));
+      printf("Frame length: %d \n", sizeof(data));
+      printf("Buffer length: %d \n", sizeof(rx_data));
+      
+      ESP_LOGI(TAG_UART, "%hhu,%f,%f,%f,%f,%f,%f,%f,%hu,%f,%hhu,%f\n", data.logic_state, data.fc_current, data.fc_sc_current, data.sc_motor_current,
+          data.fc_voltage, data.sc_voltage, data.hydrogen_sensor_voltage, data.fuel_cell_temperature,
+          data.fan_rpm, data.vehicle_speed, data.motor_pwm, data.hydrogen_pressure);
+      
+      ESP_LOG_BUFFER_HEXDUMP(TAG_UART, rx_data, sizeof(rx_data), 2);
+
+      xTaskCreatePinnedToCore(mqtt_send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &handle_mqtt,1);
+      //xTaskCreatePinnedToCore(sd_card_write,"SD_CARD_WRITE",1024*2,NULL,10,&handle_SD_Card,1); 
+    }
+  }
+}
+
+
+static void uart_init(void *arg){
 
   const uart_port_t uart_num = UART_NUM_2;
   uart_config_t uart_config = {
-    .baud_rate = 115200,
+    .baud_rate = CONFIG_UART_BAUD_RATE,
     .data_bits = UART_DATA_8_BITS,
     .parity = UART_PARITY_DISABLE,
     .stop_bits = UART_STOP_BITS_1,
@@ -283,28 +316,12 @@ static void UART_TASK(void *arg){
   ESP_ERROR_CHECK(uart_set_mode(uart_num, UART_MODE_RS485_HALF_DUPLEX));
   ESP_ERROR_CHECK(uart_set_rx_timeout(uart_num, 3));
 
-  uint8_t *rx_data = (uint8_t *) malloc(CONFIG_BUF_SIZE);
-  while(1){
 
-    int len = uart_read_bytes(uart_num, rx_data, CONFIG_BUF_SIZE, 100 / portTICK_PERIOD_MS);
+  uart_start();
 
-    if (len > 0) {
-
-      memcpy(&data, rx_data, sizeof(data));
-      printf("Frame length: %d \n", sizeof(data));
-      printf("Buffer length: %d \n", sizeof(rx_data));
-      
-      ESP_LOGI(TAG_UART, "%hhu,%f,%f,%f,%f,%f,%f,%f,%hu,%f,%hhu,%f\n", data.logic_state, data.fc_current, data.fc_sc_current, data.sc_motor_current,
-          data.fc_voltage, data.sc_voltage, data.hydrogen_sensor_voltage, data.fuel_cell_temperature,
-          data.fan_rpm, data.vehicle_speed, data.motor_pwm, data.hydrogen_pressure);
-      
-      ESP_LOG_BUFFER_HEXDUMP(TAG_UART, rx_data, sizeof(rx_data), 2);
-
-      xTaskCreatePinnedToCore(send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &handle_mqtt,1);
-      //xTaskCreatePinnedToCore(sd_card_write,"SD_CARD_WRITE",1024*2,NULL,10,&handle_SD_Card,1); 
-    }
-  }
 }
+
+
 
 
 
@@ -314,7 +331,7 @@ static void UART_TASK(void *arg){
 /////////////main section
 void app_main(void)
 {    
-gpio_reset_pin(CONFIG_STS_LED);
+  gpio_reset_pin(CONFIG_STS_LED);
   gpio_set_direction(CONFIG_STS_LED, GPIO_MODE_OUTPUT);
   // POTRZEBNE?
   esp_log_level_set("*", ESP_LOG_INFO);
@@ -326,16 +343,22 @@ gpio_reset_pin(CONFIG_STS_LED);
   esp_log_level_set("outbox", ESP_LOG_VERBOSE);
   // ?????????????  
   int rep = 0;
-  wifi_connection();
+
+  wifi_init();
+  wifi_start();
+
   while(!wifi_ready){
     ESP_LOGI(TAG_WIFI,"Connecting to WIFI");
     vTaskDelay(500/portTICK_PERIOD_MS);
     rep++;
     if(rep == 5 ){ ESP_LOGI(TAG_WIFI,"SUICIDE"); esp_restart();}
   }
- gpio_set_level(CONFIG_STS_LED, 255);
-  mqtt_app_start();
+  gpio_set_level(CONFIG_STS_LED, 255);
+  
+  mqtt_init();
+  mqtt_start();
   vTaskDelay(1000/portTICK_PERIOD_MS);
-  //sd_card_start();
-  xTaskCreatePinnedToCore(UART_TASK, "uart_echo_task",1024*4, NULL, 2,&handle_uart,0);
+  
+  //sd_card_init();
+  xTaskCreatePinnedToCore(uart_init, "uart_echo_task",1024*4, NULL, 2,&handle_uart,0);
 }
