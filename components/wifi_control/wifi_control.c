@@ -36,10 +36,28 @@ void wifi_init(){
     }};
   esp_wifi_set_mode(WIFI_MODE_STA);
   esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration);
-  
+
+  wifi_start();
+
+  if(wifi_check_connection()==0) 
+  {
+    ESP_LOGE(TAG_WIFI,"ERROR connecting to wifi, RESTART!!!");
+    esp_restart();
+  }
 }
 
 void wifi_start(){
   esp_wifi_start();
   esp_wifi_connect();
+}
+
+int wifi_check_connection(){
+  int rep = 0;
+  while(!wifi_ready){
+    ESP_LOGI(TAG_WIFI,"Connecting to WIFI");
+    vTaskDelay(500/portTICK_PERIOD_MS);
+    rep++;
+    if(rep == 5 ) return 0;
+  }
+  return 1;
 }

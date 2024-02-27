@@ -25,7 +25,7 @@ extern const char *TAG_SD_CARD;
 
 
 ///////////// Data structure
-struct dataS {  
+typedef struct{  
   union {
     struct { // TODO remove bitfield since it won't be used here anyway
       uint8_t is_emergency:1;
@@ -49,7 +49,7 @@ struct dataS {
   float vehicle_speed; // 40b
   uint8_t motor_pwm; // 44b
   float hydrogen_pressure; //48b
-}; 
+}vehicle_state_frame_t; 
 
-extern struct dataS data;
+extern vehicle_state_frame_t vehicle_state_data;
 #endif // !HEADER_H

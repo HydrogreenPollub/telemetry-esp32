@@ -1,9 +1,9 @@
 #include "mqtt_control.h"
-
+const char *TAG_MQTT = "MQTT";  
 
 esp_mqtt_client_handle_t handle_mqtt_client;
 TaskHandle_t handle_mqtt = NULL;
-const char *TAG_MQTT = "MQTT";
+
 
 /////////////mqtt section
 void mqtt_logs(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
@@ -55,6 +55,8 @@ void mqtt_init(void)
         .credentials.authentication.password = CONFIG_MQTT_PASSWD
     };
    handle_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+
+   mqtt_start();
 }
 
 void mqtt_start(){
@@ -64,19 +66,12 @@ void mqtt_start(){
 
 
 void mqtt_send_data(void *pvParameter){
-  //char buff[sizeof(data)];
-  char buff[42];
-  int i;
-  memcpy(&buff,&data,42);
-  for (i = 0; i < sizeof(data); i++)
-  {
-    // if (i > 0) printf(":");
-    // printf("%02X ", buff[i]);
-  }
-  //printf("\n");
-  printf("Frame length: %d \n", sizeof(data));
+  //char buff[sizeof(vehicle_state_data)];
+  char buff[sizeof(vehicle_state_data)];
+  memcpy(&buff,&vehicle_state_data,sizeof(vehicle_state_data));
+  printf("Frame length: %d \n", sizeof(vehicle_state_data));
   printf("Buffer length: %d \n", sizeof(buff));
-  ESP_LOG_BUFFER_HEXDUMP(TAG_UART, buff, sizeof(data), 3);
-  esp_mqtt_client_publish(handle_mqtt_client,"/sensors",buff,sizeof(data),1,0);
+  ESP_LOG_BUFFER_HEXDUMP(TAG_MQTT, buff, sizeof(vehicle_state_data), 3);
+  esp_mqtt_client_publish(handle_mqtt_client,"/sensors",buff,sizeof(vehicle_state_data),1,0);
   vTaskDelete(handle_mqtt);
 }

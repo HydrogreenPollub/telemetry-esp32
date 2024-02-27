@@ -11,7 +11,7 @@
 
 
 extern bool wifi_ready;
-#endif // !WIFI_CONTROL_H
-
 void wifi_init();
 void wifi_start();
+int wifi_check_connection();
+#endif // !WIFI_CONTROL_H

@@ -59,9 +59,7 @@ void sd_card_write(void *arg){
       ESP_LOGE(TAG_WIFI, "Failed to open file for writing");
       return;
   }
-  fprintf(f,"%hhu,%f,%f,%f,%f,%f,%f,%f,%hu,%f,%hhu,%f\n",data.logic_state,data.fc_current,data.fc_sc_current,data.sc_motor_current,
-          data.fc_voltage,data.sc_voltage,data.hydrogen_sensor_voltage,data.fuel_cell_temperature,
-          data.fan_rpm,data.vehicle_speed,data.motor_pwm,data.hydrogen_pressure);
+    ESP_LOG_BUFFER_HEXDUMP(TAG_SD_CARD, &vehicle_state_data, sizeof(vehicle_state_data), 2);
 
   fclose(f);
   ESP_LOGI(TAG_SD_CARD, "File written");

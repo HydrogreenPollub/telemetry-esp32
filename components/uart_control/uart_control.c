@@ -14,14 +14,13 @@ void uart_start(){
 
     if (len > 0) {
 
-      memcpy(&data, rx_data, sizeof(data));
-      printf("Frame length: %d \n", sizeof(data));
+      memcpy(&vehicle_state_data, rx_data, sizeof(vehicle_state_data));
+      printf("Frame length: %d \n", sizeof(vehicle_state_data));
       printf("Buffer length: %d \n", sizeof(rx_data));
       
-      ESP_LOGI(TAG_UART, "%hhu,%f,%f,%f,%f,%f,%f,%f,%hu,%f,%hhu,%f\n", data.logic_state, data.fc_current, data.fc_sc_current, data.sc_motor_current,
-          data.fc_voltage, data.sc_voltage, data.hydrogen_sensor_voltage, data.fuel_cell_temperature,
-          data.fan_rpm, data.vehicle_speed, data.motor_pwm, data.hydrogen_pressure);
-      
+      // ESP_LOGI(TAG_UART, "%hhu,%f,%f,%f,%f,%f,%f,%f,%hu,%f,%hhu,%f\n", vehicle_state_data.logic_state, vehicle_state_data.fc_current, vehicle_state_data.fc_sc_current, vehicle_state_data.sc_motor_current,
+      //     vehicle_state_data.fc_voltage, vehicle_state_data.sc_voltage, vehicle_state_data.hydrogen_sensor_voltage, vehicle_state_data.fuel_cell_temperature,
+      //     vehicle_state_data.fan_rpm, vehicle_state_data.vehicle_speed, vehicle_state_data.motor_pwm, vehicle_state_data.hydrogen_pressure);
       ESP_LOG_BUFFER_HEXDUMP(TAG_UART, rx_data, sizeof(rx_data), 2);
 
       xTaskCreatePinnedToCore(mqtt_send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &handle_mqtt,1);
