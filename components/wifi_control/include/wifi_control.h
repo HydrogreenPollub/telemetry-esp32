@@ -10,8 +10,9 @@
 #include "nvs_flash.h"
 
 
+
 extern bool wifi_ready;
 void wifi_init();
 void wifi_start();
-int wifi_check_connection();
+int wifi_has_connected();
 #endif // !WIFI_CONTROL_H

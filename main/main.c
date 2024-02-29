@@ -5,7 +5,7 @@
 #include "wifi_control.h"
 
 
-const char *TAG_WIFI = "WiFi";
+
 
 vehicle_state_frame_t vehicle_state_data;
 
@@ -25,7 +25,7 @@ void app_main(void)
   // ?????????????  
   
   wifi_init();
-  gpio_set_level(CONFIG_STS_LED, 255);
+  
   
   mqtt_init();
   vTaskDelay(1000/portTICK_PERIOD_MS);

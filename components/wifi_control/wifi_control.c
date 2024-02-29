@@ -1,6 +1,6 @@
 #include "wifi_control.h"
-
-bool wifi_ready=0;
+const char *TAG_WIFI = "WiFi";
+bool wifi_connected=0;
 
 /////////////WIFI section
 static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -14,7 +14,14 @@ static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_b
       break;
     case IP_EVENT_STA_GOT_IP:
       ESP_LOGI(TAG_WIFI,"IP acq");
-      wifi_ready = 1;
+      wifi_connected = 1;
+      gpio_set_level(CONFIG_STS_LED, 255);
+      break;
+    case WIFI_EVENT_STA_DISCONNECTED:
+      ESP_LOGE(TAG_WIFI,"lost connection");
+      wifi_connected = 0;
+      gpio_set_level(CONFIG_STS_LED, 0);
+      esp_wifi_connect();
       break;
   }
 }
@@ -28,6 +35,7 @@ void wifi_init(){
   esp_wifi_init(&wifi_initiation);
   esp_event_handler_register(WIFI_EVENT,ESP_EVENT_ANY_ID,wifi_event_handler,NULL);
   esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,wifi_event_handler, NULL);
+  esp_event_handler_register(IP_EVENT, IP_EVENT_STA_LOST_IP,wifi_event_handler, NULL);
   
   wifi_config_t wifi_configuration = {
     .sta ={
@@ -38,26 +46,27 @@ void wifi_init(){
   esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration);
 
   wifi_start();
-
-  if(wifi_check_connection()==0) 
-  {
-    ESP_LOGE(TAG_WIFI,"ERROR connecting to wifi, RESTART!!!");
-    esp_restart();
-  }
 }
 
 void wifi_start(){
   esp_wifi_start();
   esp_wifi_connect();
+    if(wifi_has_connected()==false) 
+  {
+    ESP_LOGE(TAG_WIFI,"ERROR connecting to WIFI, RESTART!!!");
+    esp_restart();
+  }
+  ESP_LOGI(TAG_WIFI,"Connected to WIFI");
+  
 }
 
-int wifi_check_connection(){
+int wifi_has_connected(){
   int rep = 0;
-  while(!wifi_ready){
+  while(!wifi_connected){
     ESP_LOGI(TAG_WIFI,"Connecting to WIFI");
     vTaskDelay(500/portTICK_PERIOD_MS);
     rep++;
-    if(rep == 5 ) return 0;
+    //if(rep == 10 ) return 0;
   }
   return 1;
 }

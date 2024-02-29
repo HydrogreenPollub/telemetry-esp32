@@ -12,6 +12,7 @@
 #include "freertos/portmacro.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "driver/gpio.h"
 
 
 
