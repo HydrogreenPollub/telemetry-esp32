@@ -66,7 +66,6 @@ void mqtt_start(){
 
 
 void mqtt_send_data(void *pvParameter){
-  //char buff[sizeof(vehicle_state_data)];
   char buff[sizeof(vehicle_state_data)];
   memcpy(&buff,&vehicle_state_data,sizeof(vehicle_state_data));
   printf("Frame length: %d \n", sizeof(vehicle_state_data));

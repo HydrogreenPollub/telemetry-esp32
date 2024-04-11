@@ -5,7 +5,14 @@
 #include "wifi_control.h"
 
 
-
+void send_data()
+{
+  for(int i = 0; i<10; i++)
+  {
+    vTaskDelay(1000/portTICK_PERIOD_MS);
+    xTaskCreatePinnedToCore(mqtt_send_data, "MQTT_DATA_TRANSMITION",1024*2, NULL, 10, &handle_mqtt,1);
+  }
+}
 
 vehicle_state_frame_t vehicle_state_data;
 
