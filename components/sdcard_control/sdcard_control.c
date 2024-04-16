@@ -1,17 +1,17 @@
 #include "sdcard_control.h"
-TaskHandle_t handle_SD_Card = NULL;
-const char *TAG_SD_CARD = "SD_CARD";
 
+TaskHandle_t handle_sdcard = NULL;
+const char* TAG_SD_CARD = "SD_CARD";
 
-/////////////sdcard section
-esp_err_t sd_card_init(){
-  esp_err_t ret;
-     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+esp_err_t sd_card_init()
+{
+    esp_err_t ret;
+    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
         .format_if_mount_failed = false,
         .max_files = 5,
-        .allocation_unit_size = 0
+        .allocation_unit_size = 0,
     };
-    sdmmc_card_t *card;
+    sdmmc_card_t* card;
     const char mount_point[] = CONFIG_MOUNT_POINT;
     ESP_LOGI(TAG_SD_CARD, "Initializing SD card");
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
@@ -25,7 +25,8 @@ esp_err_t sd_card_init(){
         .max_transfer_sz = 4000,
     };
     ret = spi_bus_initialize(host.slot, &bus_cfg, SDSPI_DEFAULT_DMA);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG_SD_CARD, "Failed to initialize bus.");
         return ret;
     }
@@ -36,10 +37,14 @@ esp_err_t sd_card_init(){
     ESP_LOGI(TAG_SD_CARD, "Mounting filesystem");
     ret = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
 
-    if (ret != ESP_OK) {
-        if (ret == ESP_FAIL) {
+    if (ret != ESP_OK)
+    {
+        if (ret == ESP_FAIL)
+        {
             ESP_LOGE(TAG_SD_CARD, "Failed to mount filesystem. ");
-        } else {
+        }
+        else
+        {
             ESP_LOGE(TAG_SD_CARD, "Failed to initialize the card (%s). ", esp_err_to_name(ret));
         }
         return ret;
@@ -48,20 +53,22 @@ esp_err_t sd_card_init(){
 
     // Card has been initialized, print its properties
     sdmmc_card_print_info(stdout, card);
-  return ret;
+    return ret;
 }
 
-void sd_card_write(void *arg){
-  const char *file_path = CONFIG_MOUNT_POINT"/SD_data.txt";
-  ESP_LOGI(TAG_WIFI, "Opening file %s", CONFIG_MOUNT_POINT);
-  FILE *f = fopen(file_path, "a");
-  if (f == NULL) {
-      ESP_LOGE(TAG_WIFI, "Failed to open file for writing");
-      return;
-  }
+void sd_card_write(void* arg)
+{
+    const char* file_path = CONFIG_MOUNT_POINT "/SD_data.txt";
+    ESP_LOGI(TAG_WIFI, "Opening file %s", CONFIG_MOUNT_POINT);
+    FILE* f = fopen(file_path, "a");
+    if (f == NULL)
+    {
+        ESP_LOGE(TAG_WIFI, "Failed to open file for writing");
+        return;
+    }
     ESP_LOG_BUFFER_HEXDUMP(TAG_SD_CARD, &vehicle_state_data, sizeof(vehicle_state_data), 2);
 
-  fclose(f);
-  ESP_LOGI(TAG_SD_CARD, "File written");
-  vTaskDelete(handle_SD_Card);
+    fclose(f);
+    ESP_LOGI(TAG_SD_CARD, "File written");
+    vTaskDelete(handle_sdcard);
 }

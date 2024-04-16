@@ -1,5 +1,6 @@
 #ifndef PROTO_CONTROL_H
 #define PROTO_CONTROL_H
+
 #include "header.h"
 #include "vehicle_data.capnp.h"
 
