@@ -4,4 +4,9 @@
     "idf.openOcdConfigs": [
         "target/esp32.cfg"
     ],
+    "files.associations": {
+        "canopennode_esp32.h": "c",
+        "od.h": "c"
+    },
+    "idf.flashType": "UART",
 }

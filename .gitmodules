@@ -1,3 +1,8 @@
 [submodule "components/CANopenNode_ESP32"]
 	path = components/CANopenNode_ESP32
 	url = https://github.com/sicrisembay/CANopenNode_ESP32
+
+[submodule "components/gps-component-esp32"]
+	path = components/gps-component-esp32
+	url = https://github.com/HydrogreenPollub/gps-component-esp32
+	

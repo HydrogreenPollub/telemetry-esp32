@@ -7,6 +7,6 @@
 extern TaskHandle_t handle_uart;
 
 void uart_start();
-void uart_init(void* arg);
+void uart_init();
 
 #endif // !UART_CONTROL_H

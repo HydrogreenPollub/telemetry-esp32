@@ -32,7 +32,7 @@ void uart_start()
     }
 }
 
-void uart_init(void* arg)
+void uart_init()
 {
     const uart_port_t uart_num = UART_NUM_2;
     uart_config_t uart_config = {
