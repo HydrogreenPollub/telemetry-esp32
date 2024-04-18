@@ -6,8 +6,35 @@
 #include "CANopenNode_ESP32.h"
 #include "OD.h"
 #include "gps_component.h"
+#include "proto_control.h"
 
-vehicle_state_frame_t vehicle_state_data;
+struct VehicleData vehicle_state_data = {
+    .isEmergency = 1,
+    .isHydrogenLeaking = 0,
+    .isScRelayClosed = 0,
+    .vehicleIsSpeedButtonPressed = 0,
+    .vehicleIsHalfSpeedButtonPressed = 1,
+    .hydrogenCellOneButtonState = 1,
+    .hydrogenCellTwoButtonState = 1,
+    .isSuperCapacitorButtonPressed = 1,
+    .logicState = 12,
+    .fcCurrent = 2.1,
+    .fcScCurrent = 2.2,
+    .scMotorCurrent = 2.3,
+    .fcVoltage = 2.4,
+    .scVoltage = 2.5,
+    .hydrogenSensorVoltage = 2.6,
+    .fuelCellTemperature = 2.7,
+    .fanRpm = 5,
+    .vehicleSpeed = 2.8,
+    .motorPwm = 12,
+    .hydrogenPressure = 2.9,
+};
+
+params_send_mqtt_t send_params = {
+    .buffer_len = 0,
+    .serialized_vehicle_data = {},
+};
 
 #define TIME_ZONE (+8)   // Beijing Time
 #define YEAR_BASE (2000) // date in GPS starts from 2000
@@ -58,17 +85,25 @@ static void start_gps()
     nmea_parser_add_handler(nmea_hdl, gps_event_handler, NULL);
 }
 
+void test_data_send()
+{
+    serialize_vehicle_data(&vehicle_state_data, &(send_params.serialized_vehicle_data), &(send_params.buffer_len));
+    xTaskCreatePinnedToCore(mqtt_send_data, "MQTT_DATA_TRANSMITION", 1024 * 2, &send_params, 10, &handle_mqtt, 1);
+}
+
 void app_main(void)
 {
     // gpio_reset_pin(CONFIG_STS_LED);
     // gpio_set_direction(CONFIG_STS_LED, GPIO_MODE_OUTPUT);
 
-    CO_ESP32_init();
-    start_gps();
-    // wifi_init();
-    // mqtt_init();
-
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-
+    // CO_ESP32_init();
+    // start_gps();
+    wifi_init();
+    mqtt_init();
+    while (1)
+    {
+        test_data_send();
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
     // xTaskCreatePinnedToCore(uart_init, "uart_echo_task", 1024 * 4, NULL, 2, &handle_uart, 0);
 }

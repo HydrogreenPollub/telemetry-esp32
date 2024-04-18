@@ -16,12 +16,12 @@ static void wifi_event_handler(void* event_handler_arg, esp_event_base_t event_b
         case IP_EVENT_STA_GOT_IP:
             ESP_LOGI(TAG_WIFI, "IP acq");
             wifi_connected = 1;
-            gpio_set_level(CONFIG_STS_LED, 255);
+            // gpio_set_level(CONFIG_STS_LED, 255);
             break;
         case WIFI_EVENT_STA_DISCONNECTED:
             ESP_LOGE(TAG_WIFI, "lost connection");
             wifi_connected = 0;
-            gpio_set_level(CONFIG_STS_LED, 0);
+            // gpio_set_level(CONFIG_STS_LED, 0);
             esp_wifi_connect();
             break;
     }

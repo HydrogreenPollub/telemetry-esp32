@@ -5,8 +5,10 @@
 TaskHandle_t handle_uart = NULL;
 const char* TAG_UART = "UART";
 
-void uart_start()
+void uart_start(vehicle_data_t* vehicle_state_data)
 {
+    uint8_t serialized_vehicle_data[4096];
+    ssize_t buffer_len = 0;
     uint8_t* rx_data = (uint8_t*) malloc(CONFIG_BUF_SIZE);
     while (1)
     {
@@ -14,8 +16,8 @@ void uart_start()
 
         if (len > 0)
         {
-            memcpy(&vehicle_state_data, rx_data, sizeof(vehicle_state_data));
-            printf("Frame length: %d \n", sizeof(vehicle_state_data));
+            memcpy(vehicle_state_data, rx_data, sizeof(&vehicle_state_data));
+            printf("Frame length: %d \n", sizeof(&vehicle_state_data));
             printf("Buffer length: %d \n", sizeof(rx_data));
 
             // ESP_LOGI(TAG_UART, "%hhu,%f,%f,%f,%f,%f,%f,%f,%hu,%f,%hhu,%f\n", vehicle_state_data.logic_state,
@@ -32,7 +34,7 @@ void uart_start()
     }
 }
 
-void uart_init()
+void uart_init(vehicle_data_t* vehicle_state_data)
 {
     const uart_port_t uart_num = UART_NUM_2;
     uart_config_t uart_config = {
@@ -52,5 +54,5 @@ void uart_init()
     ESP_ERROR_CHECK(uart_set_mode(uart_num, UART_MODE_RS485_HALF_DUPLEX));
     ESP_ERROR_CHECK(uart_set_rx_timeout(uart_num, 3));
 
-    uart_start();
+    uart_start(&vehicle_state_data);
 }

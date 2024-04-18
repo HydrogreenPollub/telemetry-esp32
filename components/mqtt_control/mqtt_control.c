@@ -81,11 +81,12 @@ void mqtt_start()
 
 void mqtt_send_data(void* pvParameter)
 {
-    char buff[sizeof(vehicle_state_data)];
-    memcpy(&buff, &vehicle_state_data, sizeof(vehicle_state_data));
-    printf("Frame length: %d \n", sizeof(vehicle_state_data));
+    params_send_mqtt_t* params = pvParameter;
+    char buff[params->buffer_len];
+    memcpy(&buff, params->serialized_vehicle_data, params->buffer_len);
+    printf("Frame length: %d \n", params->buffer_len);
     printf("Buffer length: %d \n", sizeof(buff));
-    ESP_LOG_BUFFER_HEXDUMP(TAG_MQTT, buff, sizeof(vehicle_state_data), 3);
-    esp_mqtt_client_publish(handle_mqtt_client, "/sensors", buff, sizeof(vehicle_state_data), 1, 0);
+    ESP_LOG_BUFFER_HEXDUMP(TAG_MQTT, buff, params->buffer_len, 3);
+    esp_mqtt_client_publish(handle_mqtt_client, "/sensors", buff, params->buffer_len, 1, 0);
     vTaskDelete(handle_mqtt);
 }

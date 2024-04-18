@@ -4,10 +4,8 @@
 #include "header.h"
 #include "vehicle_data.capnp.h"
 
-void serialize_vehicle_data();
+typedef struct VehicleData vehicle_data_t;
 
-extern ssize_t serialized_vehicle_data;
-extern ssize_t buffer_len;
-extern uint8_t buf[4096];
+void serialize_vehicle_data(vehicle_data_t* vehicle_state_data, uint8_t* serialized_vehicle_data, ssize_t* buffer_len);
 
 #endif // !PROTO_CONTROL_H
