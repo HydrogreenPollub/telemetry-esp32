@@ -36,6 +36,9 @@ params_send_mqtt_t send_params = {
     .serialized_vehicle_data = {},
 };
 
+
+
+
 #define TIME_ZONE (+8)   // Beijing Time
 #define YEAR_BASE (2000) // date in GPS starts from 2000
 
@@ -87,8 +90,12 @@ static void start_gps()
 
 void test_data_send()
 {
-    serialize_vehicle_data(&vehicle_state_data, &(send_params.serialized_vehicle_data), &(send_params.buffer_len));
-    xTaskCreatePinnedToCore(mqtt_send_data, "MQTT_DATA_TRANSMITION", 1024 * 2, &send_params, 10, &handle_mqtt, 1);
+    serialize_vehicle_data(vehicle_state_data, send_params.serialized_vehicle_data, &(send_params.buffer_len));
+    // for(int i = 0; i<=100;i++)
+    //     ESP_LOGW("test", "%hhn", send_params.serialized_vehicle_data);
+    // ESP_LOGW("data","%d", (int)send_params.serialized_vehicle_data);
+    // ESP_LOGW("buf_len","%d", send_params.buffer_len);
+    xTaskCreatePinnedToCore(mqtt_send_data, "MQTT_DATA_TRANSMITION", 1024 * 4, (void*)&send_params, 10, &handle_mqtt, 1);
 }
 
 void app_main(void)

@@ -87,6 +87,7 @@ void mqtt_send_data(void* pvParameter)
     printf("Frame length: %d \n", params->buffer_len);
     printf("Buffer length: %d \n", sizeof(buff));
     ESP_LOG_BUFFER_HEXDUMP(TAG_MQTT, buff, params->buffer_len, 3);
-    esp_mqtt_client_publish(handle_mqtt_client, "/sensors", buff, params->buffer_len, 1, 0);
+    int temp =esp_mqtt_client_publish(handle_mqtt_client, "/sensors", buff, params->buffer_len, 1, 0);
+    ESP_LOGE("mqtt returned val", "%d",temp);
     vTaskDelete(handle_mqtt);
 }
