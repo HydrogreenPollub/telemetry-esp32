@@ -83,11 +83,11 @@ void mqtt_send_data(void* pvParameter)
 {
     params_send_mqtt_t* params = pvParameter;
     char buff[params->buffer_len];
-    memcpy(&buff, params->serialized_vehicle_data, params->buffer_len);
-    printf("Frame length: %d \n", params->buffer_len);
-    printf("Buffer length: %d \n", sizeof(buff));
-    ESP_LOG_BUFFER_HEXDUMP(TAG_MQTT, buff, params->buffer_len, 3);
-    int temp =esp_mqtt_client_publish(handle_mqtt_client, "/sensors", buff, params->buffer_len, 1, 0);
-    ESP_LOGE("mqtt returned val", "%d",temp);
+    memcpy(&buff, params->serialized_data, params->buffer_len);
+    // ESP_LOGI(TAG_MQTT, "Frame length: %d \n", params->buffer_len);
+    // ESP_LOGI(TAG_MQTT, "Buffer length: %d \n", sizeof(buff));
+    // ESP_LOG_BUFFER_HEXDUMP(TAG_MQTT, buff, params->buffer_len, 3);
+    int temp = esp_mqtt_client_publish(handle_mqtt_client, "sensors", buff, params->buffer_len, 1, 0);
+    // ESP_LOGE(TAG_MQTT, "mqtt returned val %d", temp);
     vTaskDelete(handle_mqtt);
 }

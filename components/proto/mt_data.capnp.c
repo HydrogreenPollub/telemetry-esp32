@@ -1,25 +1,25 @@
-#include "vehicle_data.capnp.h"
+#include "mt_data.capnp.h"
 /* AUTO GENERATED - DO NOT EDIT */
 #ifdef __GNUC__
 # define capnp_unused __attribute__((unused))
-# define capnp_use(x) (void) (x);
+# define capnp_use(x) (void) x;
 #else
 # define capnp_unused
 # define capnp_use(x)
 #endif
 
 
-VehicleData_ptr new_VehicleData(struct capn_segment *s) {
-	VehicleData_ptr p;
+MTData_ptr new_MTData(struct capn_segment *s) {
+	MTData_ptr p;
 	p.p = capn_new_struct(s, 48, 0);
 	return p;
 }
-VehicleData_list new_VehicleData_list(struct capn_segment *s, int len) {
-	VehicleData_list p;
+MTData_list new_MTData_list(struct capn_segment *s, int len) {
+	MTData_list p;
 	p.p = capn_new_list(s, len, 48, 0);
 	return p;
 }
-void read_VehicleData(struct VehicleData *s capnp_unused, VehicleData_ptr p) {
+void read_MTData(struct MTData *s capnp_unused, MTData_ptr p) {
 	capn_resolve(&p.p);
 	capnp_use(s);
 	s->isEmergency = (capn_read8(p.p, 0) & 1) != 0;
@@ -43,7 +43,7 @@ void read_VehicleData(struct VehicleData *s capnp_unused, VehicleData_ptr p) {
 	s->motorPwm = (int32_t) ((int32_t)capn_read32(p.p, 40));
 	s->hydrogenPressure = capn_to_f32(capn_read32(p.p, 44));
 }
-void write_VehicleData(const struct VehicleData *s capnp_unused, VehicleData_ptr p) {
+void write_MTData(const struct MTData *s capnp_unused, MTData_ptr p) {
 	capn_resolve(&p.p);
 	capnp_use(s);
 	capn_write1(p.p, 0, s->isEmergency != 0);
@@ -67,13 +67,13 @@ void write_VehicleData(const struct VehicleData *s capnp_unused, VehicleData_ptr
 	capn_write32(p.p, 40, (uint32_t) (s->motorPwm));
 	capn_write32(p.p, 44, capn_from_f32(s->hydrogenPressure));
 }
-void get_VehicleData(struct VehicleData *s, VehicleData_list l, int i) {
-	VehicleData_ptr p;
+void get_MTData(struct MTData *s, MTData_list l, int i) {
+	MTData_ptr p;
 	p.p = capn_getp(l.p, i, 0);
-	read_VehicleData(s, p);
+	read_MTData(s, p);
 }
-void set_VehicleData(const struct VehicleData *s, VehicleData_list l, int i) {
-	VehicleData_ptr p;
+void set_MTData(const struct MTData *s, MTData_list l, int i) {
+	MTData_ptr p;
 	p.p = capn_getp(l.p, i, 0);
-	write_VehicleData(s, p);
+	write_MTData(s, p);
 }

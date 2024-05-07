@@ -51,7 +51,7 @@ extern const char* TAG_SD_CARD;
 typedef struct
 {
     ssize_t buffer_len;
-    uint8_t serialized_vehicle_data[4096];
+    uint8_t serialized_data[4096];
 
 } params_send_mqtt_t;
 // extern vehicle_state_frame_t vehicle_state_data;

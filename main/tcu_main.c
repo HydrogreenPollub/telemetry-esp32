@@ -8,50 +8,23 @@
 #include "gps_component.h"
 #include "proto_control.h"
 
-struct VehicleData vehicle_state_data = {
-    .isEmergency = 1,
-    .isHydrogenLeaking = 0,
-    .isScRelayClosed = 0,
-    .vehicleIsSpeedButtonPressed = 0,
-    .vehicleIsHalfSpeedButtonPressed = 1,
-    .hydrogenCellOneButtonState = 1,
-    .hydrogenCellTwoButtonState = 1,
-    .isSuperCapacitorButtonPressed = 1,
-    .logicState = 12,
-    .fcCurrent = 2.1,
-    .fcScCurrent = 2.2,
-    .scMotorCurrent = 2.3,
-    .fcVoltage = 2.4,
-    .scVoltage = 2.5,
-    .hydrogenSensorVoltage = 2.6,
-    .fuelCellTemperature = 2.7,
-    .fanRpm = 5,
-    .vehicleSpeed = 2.8,
-    .motorPwm = 12,
-    .hydrogenPressure = 2.9,
-};
+telemetry_server_data_t ts_data;
+master_telemetry_data_t mt_data;
 
-params_send_mqtt_t send_params = {
+params_send_mqtt_t ts_params = {
     .buffer_len = 0,
-    .serialized_vehicle_data = {},
+    .serialized_data = {},
 };
 
+params_send_mqtt_t mt_params = {
+    .buffer_len = 0,
+    .serialized_data = {},
+};
 
-
-
-#define TIME_ZONE (+8)   // Beijing Time
-#define YEAR_BASE (2000) // date in GPS starts from 2000
-
+#define TIME_ZONE (+2)
+#define YEAR_BASE (2000)
 static const char* TAG = "gps_demo";
 
-/**
- * @brief GPS Event Handler
- *
- * @param event_handler_arg handler specific arguments
- * @param event_base event base, here is fixed to ESP_NMEA_EVENT
- * @param event_id event id
- * @param event_data event specific arguments
- */
 static void gps_event_handler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     gps_t* gps = NULL;
@@ -88,29 +61,37 @@ static void start_gps()
     nmea_parser_add_handler(nmea_hdl, gps_event_handler, NULL);
 }
 
-void test_data_send()
+void send_telemetry_server_data()
 {
-    serialize_vehicle_data(vehicle_state_data, send_params.serialized_vehicle_data, &(send_params.buffer_len));
-    // for(int i = 0; i<=100;i++)
-    //     ESP_LOGW("test", "%hhn", send_params.serialized_vehicle_data);
-    // ESP_LOGW("data","%d", (int)send_params.serialized_vehicle_data);
-    // ESP_LOGW("buf_len","%d", send_params.buffer_len);
-    xTaskCreatePinnedToCore(mqtt_send_data, "MQTT_DATA_TRANSMITION", 1024 * 4, (void*)&send_params, 10, &handle_mqtt, 1);
+    serialize_telemetry_server_data(ts_data, ts_params.serialized_data, &(ts_params.buffer_len));
+    xTaskCreatePinnedToCore(mqtt_send_data, "MQTT_DATA_TRANSMITION", 1024 * 4, (void*) &ts_params, 10, &handle_mqtt, 1);
+}
+
+void on_uart_receive(uint8_t* rx_buffer, uint32_t size)
+{
+    memcpy(mt_params.serialized_data, rx_buffer, size);
+    mt_params.buffer_len = (ssize_t) size;
+    int result = deserialize_master_telemetry_data(&mt_data, mt_params.serialized_data, &(mt_params.buffer_len));
+
+    ts_data.vehicleSpeed = mt_data.vehicleSpeed;
+    // TODO add the rest
 }
 
 void app_main(void)
 {
-    // gpio_reset_pin(CONFIG_STS_LED);
-    // gpio_set_direction(CONFIG_STS_LED, GPIO_MODE_OUTPUT);
-
     // CO_ESP32_init();
     // start_gps();
+
     wifi_init();
     mqtt_init();
+    uart_init(on_uart_receive);
+
+    uint8_t temp[3] = { 'x', 'D', '\0' };
+
     while (1)
     {
-        test_data_send();
+        send_telemetry_server_data();
         vTaskDelay(1000 / portTICK_PERIOD_MS);
+        uart_send_data(temp, 2);
     }
-    // xTaskCreatePinnedToCore(uart_init, "uart_echo_task", 1024 * 4, NULL, 2, &handle_uart, 0);
 }

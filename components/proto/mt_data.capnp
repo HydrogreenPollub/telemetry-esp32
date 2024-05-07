@@ -1,8 +1,6 @@
+@0xe662ae37d8c21445;
 
-
-@0xfed348f2ac943a04;
-
-struct VehicleData{
+struct MTData {
     isEmergency @0 :Bool;
     isHydrogenLeaking @1 :Bool;
     isScRelayClosed @2 :Bool;
@@ -11,7 +9,7 @@ struct VehicleData{
     hydrogenCellOneButtonState @5 :Bool;
     hydrogenCellTwoButtonState @6 :Bool;
     isSuperCapacitorButtonPressed @7 :Bool;
-    logicState @8 : Int8;
+    logicState @8 :Int8;
 
     fcCurrent @9 :Float32;
     fcScCurrent @10 :Float32;

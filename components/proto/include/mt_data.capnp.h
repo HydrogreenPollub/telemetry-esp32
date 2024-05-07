@@ -1,5 +1,5 @@
-#ifndef CAPN_FED348F2AC943A04
-#define CAPN_FED348F2AC943A04
+#ifndef CAPN_E662AE37D8C21445
+#define CAPN_E662AE37D8C21445
 /* AUTO GENERATED - DO NOT EDIT */
 #include <capnp_c.h>
 
@@ -20,13 +20,13 @@
 extern "C" {
 #endif
 
-struct VehicleData;
+struct MTData;
 
-typedef struct {capn_ptr p;} VehicleData_ptr;
+typedef struct {capn_ptr p;} MTData_ptr;
 
-typedef struct {capn_ptr p;} VehicleData_list;
+typedef struct {capn_ptr p;} MTData_list;
 
-struct VehicleData {
+struct MTData {
 	unsigned isEmergency : 1;
 	unsigned isHydrogenLeaking : 1;
 	unsigned isScRelayClosed : 1;
@@ -49,24 +49,24 @@ struct VehicleData {
 	float hydrogenPressure;
 };
 
-static const size_t VehicleData_word_count = 6;
+static const size_t MTData_word_count = 6;
 
-static const size_t VehicleData_pointer_count = 0;
+static const size_t MTData_pointer_count = 0;
 
-static const size_t VehicleData_struct_bytes_count = 48;
+static const size_t MTData_struct_bytes_count = 48;
 
 
-VehicleData_ptr new_VehicleData(struct capn_segment*);
+MTData_ptr new_MTData(struct capn_segment*);
 
-VehicleData_list new_VehicleData_list(struct capn_segment*, int len);
+MTData_list new_MTData_list(struct capn_segment*, int len);
 
-void read_VehicleData(struct VehicleData*, VehicleData_ptr);
+void read_MTData(struct MTData*, MTData_ptr);
 
-void write_VehicleData(const struct VehicleData*, VehicleData_ptr);
+void write_MTData(const struct MTData*, MTData_ptr);
 
-void get_VehicleData(struct VehicleData*, VehicleData_list, int i);
+void get_MTData(struct MTData*, MTData_list, int i);
 
-void set_VehicleData(const struct VehicleData*, VehicleData_list, int i);
+void set_MTData(const struct MTData*, MTData_list, int i);
 
 #ifdef __cplusplus
 }

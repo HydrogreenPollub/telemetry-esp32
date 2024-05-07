@@ -6,7 +6,19 @@
     ],
     "files.associations": {
         "canopennode_esp32.h": "c",
-        "od.h": "c"
+        "od.h": "c",
+        "proto_control.h": "c",
+        "array": "c",
+        "hash_map": "c",
+        "string_view": "c",
+        "initializer_list": "c",
+        "span": "c",
+        "stacktrace": "c",
+        "valarray": "c",
+        "*.ipp": "c",
+        "format": "c",
+        "*.tcc": "c",
+        "charconv": "c"
     },
     "idf.flashType": "UART",
 }

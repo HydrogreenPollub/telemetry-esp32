@@ -4,9 +4,11 @@
 #include "header.h"
 #include "driver/uart.h"
 #include "proto_control.h"
+
 extern TaskHandle_t handle_uart;
 
-void uart_start(vehicle_data_t* vehicle_state_data);
-void uart_init(vehicle_data_t* vehicle_state_data);
+void uart_start();
+void uart_init(void (*on_read_callback)(uint8_t*, uint32_t));
+void uart_send_data(uint8_t* data, uint32_t size);
 
 #endif // !UART_CONTROL_H
