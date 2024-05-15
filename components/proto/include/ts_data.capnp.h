@@ -47,13 +47,16 @@ struct TSData {
 	float vehicleSpeed;
 	int32_t motorPwm;
 	float hydrogenPressure;
+	float fcCurrentRaw;
+	float fcVoltageRaw;
+	float mcCurrent;
 };
 
-static const size_t TSData_word_count = 6;
+static const size_t TSData_word_count = 8;
 
 static const size_t TSData_pointer_count = 0;
 
-static const size_t TSData_struct_bytes_count = 48;
+static const size_t TSData_struct_bytes_count = 64;
 
 
 TSData_ptr new_TSData(struct capn_segment*);

@@ -1,12 +1,22 @@
+#include "freertos/idf_additions.h"
 #include "header.h"
 #include "mqtt_control.h"
 #include "sdcard_control.h"
+#include "driver/i2c_master.h"
 #include "uart_control.h"
 #include "wifi_control.h"
 #include "CANopenNode_ESP32.h"
 #include "OD.h"
 #include "gps_component.h"
 #include "proto_control.h"
+#include "mcp342x.h"
+
+#define I2C_PORT 0
+#define I2C_MASTER_SCL_IO 19
+#define I2C_MASTER_SDA_IO 18
+TaskHandle_t handle_adc;
+
+
 
 telemetry_server_data_t ts_data;
 master_telemetry_data_t mt_data;
@@ -77,6 +87,74 @@ void on_uart_receive(uint8_t* rx_buffer, uint32_t size)
     // TODO add the rest
 }
 
+
+
+
+void adc_handler()
+{
+    config_mcp3424_t mcp_conf = {
+		._address = 0x6e,
+		._resolution = 18,
+		._mode = 1,
+		._PGA = 0,
+		._channel = 2,
+	};
+	///////////////////////////////////////////////config for i2c
+	i2c_master_bus_config_t i2c_mst_config = {
+		.clk_source = I2C_CLK_SRC_DEFAULT,
+		.i2c_port = I2C_PORT,
+		.scl_io_num = I2C_MASTER_SCL_IO,
+		.sda_io_num = I2C_MASTER_SDA_IO,
+		.glitch_ignore_cnt = 7,
+		.flags.enable_internal_pullup = true,
+	};
+	i2c_master_bus_handle_t bus_handle;
+	ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_mst_config, &bus_handle));
+
+	i2c_device_config_t dev_cfg = {
+		.dev_addr_length = I2C_ADDR_BIT_LEN_7,
+		.device_address = 0x6e,
+		.scl_speed_hz = 100000,
+	};
+	i2c_master_dev_handle_t dev_handle;
+
+	ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &dev_handle));
+	ESP_LOGI("I2C", "bus add device mcp3424");
+///////////////////////////////////////////////////////////////
+
+    uint8_t i = 0;
+    while(1)
+	{
+        for(i = 0; i<4; i++)
+        {
+            mcp_conf._channel=i;
+            mcp342x_init(&mcp_conf, dev_handle);         
+            mcp342x_new_conversion(dev_handle, &mcp_conf);
+            switch (i) {
+                //channel 0 of adc
+                case 0:
+                    ts_data.mcCurrent = mcp342x_measure(dev_handle,&mcp_conf);
+                    break;
+                //channel 1 of adc
+                case 1:
+                    ts_data.hydrogenPressure = mcp342x_measure(dev_handle,&mcp_conf);
+                    break;
+                //channel 2 of adc
+                case 2:
+                    ts_data.fcCurrentRaw = mcp342x_measure(dev_handle,&mcp_conf);
+                    break;
+                //channel 3 of adc
+                case 3:
+                    ts_data.fcVoltageRaw = mcp342x_measure(dev_handle,&mcp_conf);
+                    break;
+                default:
+                    break;
+            }
+            ESP_LOGI("I2C - meas", "channel: %d, value: %lf", i, mcp342x_measure(dev_handle,&mcp_conf));
+            vTaskDelay(200 / portTICK_PERIOD_MS);
+        }
+	}///////////end of while
+}
 void app_main(void)
 {
     // CO_ESP32_init();
@@ -87,7 +165,8 @@ void app_main(void)
     uart_init(on_uart_receive);
 
     uint8_t temp[3] = { 'x', 'D', '\0' };
-
+    
+    xTaskCreatePinnedToCore(adc_handler, "adc read", 1024 * 4, NULL, 10, &handle_adc, 1);
     while (1)
     {
         send_telemetry_server_data();

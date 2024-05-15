@@ -2,7 +2,7 @@
 /* AUTO GENERATED - DO NOT EDIT */
 #ifdef __GNUC__
 # define capnp_unused __attribute__((unused))
-# define capnp_use(x) (void) x;
+# define capnp_use(x) (void) (x);
 #else
 # define capnp_unused
 # define capnp_use(x)
@@ -11,12 +11,12 @@
 
 TSData_ptr new_TSData(struct capn_segment *s) {
 	TSData_ptr p;
-	p.p = capn_new_struct(s, 48, 0);
+	p.p = capn_new_struct(s, 64, 0);
 	return p;
 }
 TSData_list new_TSData_list(struct capn_segment *s, int len) {
 	TSData_list p;
-	p.p = capn_new_list(s, len, 48, 0);
+	p.p = capn_new_list(s, len, 64, 0);
 	return p;
 }
 void read_TSData(struct TSData *s capnp_unused, TSData_ptr p) {
@@ -42,6 +42,9 @@ void read_TSData(struct TSData *s capnp_unused, TSData_ptr p) {
 	s->vehicleSpeed = capn_to_f32(capn_read32(p.p, 36));
 	s->motorPwm = (int32_t) ((int32_t)capn_read32(p.p, 40));
 	s->hydrogenPressure = capn_to_f32(capn_read32(p.p, 44));
+	s->fcCurrentRaw = capn_to_f32(capn_read32(p.p, 48));
+	s->fcVoltageRaw = capn_to_f32(capn_read32(p.p, 52));
+	s->mcCurrent = capn_to_f32(capn_read32(p.p, 56));
 }
 void write_TSData(const struct TSData *s capnp_unused, TSData_ptr p) {
 	capn_resolve(&p.p);
@@ -66,6 +69,9 @@ void write_TSData(const struct TSData *s capnp_unused, TSData_ptr p) {
 	capn_write32(p.p, 36, capn_from_f32(s->vehicleSpeed));
 	capn_write32(p.p, 40, (uint32_t) (s->motorPwm));
 	capn_write32(p.p, 44, capn_from_f32(s->hydrogenPressure));
+	capn_write32(p.p, 48, capn_from_f32(s->fcCurrentRaw));
+	capn_write32(p.p, 52, capn_from_f32(s->fcVoltageRaw));
+	capn_write32(p.p, 56, capn_from_f32(s->mcCurrent));
 }
 void get_TSData(struct TSData *s, TSData_list l, int i) {
 	TSData_ptr p;
