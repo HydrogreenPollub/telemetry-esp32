@@ -3,6 +3,7 @@
 #include "mqtt_control.h"
 #include "sdcard_control.h"
 #include "driver/i2c_master.h"
+#include "driver/ledc.h"
 #include "uart_control.h"
 #include "wifi_control.h"
 #include "CANopenNode_ESP32.h"
@@ -11,12 +12,11 @@
 #include "proto_control.h"
 #include "mcp342x.h"
 
-#define I2C_PORT 0
+#define I2C_PORT          0
 #define I2C_MASTER_SCL_IO 19
 #define I2C_MASTER_SDA_IO 18
+
 TaskHandle_t handle_adc;
-
-
 
 telemetry_server_data_t ts_data;
 master_telemetry_data_t mt_data;
@@ -53,10 +53,10 @@ static void gps_event_handler(void* event_handler_arg, esp_event_base_t event_ba
                 gps->date.year + YEAR_BASE, gps->date.month, gps->date.day, gps->tim.hour + TIME_ZONE, gps->tim.minute,
                 gps->tim.second, gps->latitude, gps->longitude, gps->altitude, gps->speed);
 
-            ts_data.gpsAltitude = gps->latitude;
-            ts_data.gpsLatitude = gps->latitude;
-            ts_data.gpsLongitude = gps->longitude;
-            ts_data.gpsSpeed = gps->speed;
+            // ts_data.gpsAltitude = gps->latitude;
+            // ts_data.gpsLatitude = gps->latitude;
+            // ts_data.gpsLongitude = gps->longitude;
+            // ts_data.gpsSpeed = gps->speed;
 
             break;
         case GPS_UNKNOWN:
@@ -102,100 +102,123 @@ void on_uart_receive(uint8_t* rx_buffer, uint32_t size)
     ts_data.isEmergency = mt_data.isEmergency;
     ts_data.isHydrogenLeaking = mt_data.isHydrogenLeaking;
     ts_data.isScRelayClosed = mt_data.isScRelayClosed;
-    ts_data.motorSpeed = ts_data.motorSpeed;
-    ts_data.motorCurrent = ts_data.motorCurrent;
+    // ts_data.motorSpeed = mt_data.motorSpeed;
+    // ts_data.motorCurrent = mt_data.motorCurrent;
 
     has_received_uart_data = true;
 }
 
-
-
-
 void adc_handler()
 {
     config_mcp3424_t mcp_conf = {
-		._address = 0x6e,
-		._resolution = 18,
-		._mode = 1,
-		._PGA = 0,
-		._channel = 2,
-	};
-	///////////////////////////////////////////////config for i2c
-	i2c_master_bus_config_t i2c_mst_config = {
-		.clk_source = I2C_CLK_SRC_DEFAULT,
-		.i2c_port = I2C_PORT,
-		.scl_io_num = I2C_MASTER_SCL_IO,
-		.sda_io_num = I2C_MASTER_SDA_IO,
-		.glitch_ignore_cnt = 7,
-		.flags.enable_internal_pullup = true,
-	};
-	i2c_master_bus_handle_t bus_handle;
-	ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_mst_config, &bus_handle));
+        ._address = 0x6e,
+        ._resolution = 18,
+        ._mode = 1,
+        ._PGA = 0,
+        ._channel = 2,
+    };
 
-	i2c_device_config_t dev_cfg = {
-		.dev_addr_length = I2C_ADDR_BIT_LEN_7,
-		.device_address = 0x6e,
-		.scl_speed_hz = 100000,
-	};
-	i2c_master_dev_handle_t dev_handle;
+    i2c_master_bus_config_t i2c_mst_config = {
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .i2c_port = I2C_PORT,
+        .scl_io_num = I2C_MASTER_SCL_IO,
+        .sda_io_num = I2C_MASTER_SDA_IO,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
+    i2c_master_bus_handle_t bus_handle;
+    ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_mst_config, &bus_handle));
 
-	ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &dev_handle));
-	ESP_LOGI("I2C", "bus add device mcp3424");
-///////////////////////////////////////////////////////////////
+    i2c_device_config_t dev_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = 0x6e,
+        .scl_speed_hz = 100000,
+    };
+    i2c_master_dev_handle_t dev_handle;
+
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &dev_handle));
+    ESP_LOGI("I2C", "bus add device mcp3424");
 
     uint8_t i = 0;
-    while(1)
-	{
-        for(i = 0; i<4; i++)
+    while (1)
+    {
+        for (i = 0; i < 4; i++)
         {
-            mcp_conf._channel=i;
-            mcp342x_init(&mcp_conf, dev_handle);         
+            mcp_conf._channel = i;
+            mcp342x_init(&mcp_conf, dev_handle);
             mcp342x_new_conversion(dev_handle, &mcp_conf);
-            switch (i) {
-                //channel 0 of adc
+            switch (i)
+            {
+                // channel 0 of adc
                 case 0:
-                    ts_data.mcCurrent = mcp342x_measure(dev_handle,&mcp_conf);
+                    ts_data.mcCurrent = mcp342x_measure(dev_handle, &mcp_conf);
                     break;
-                //channel 1 of adc
+                // channel 1 of adc
                 case 1:
-                    ts_data.hydrogenPressure = mcp342x_measure(dev_handle,&mcp_conf);
+                    ts_data.hydrogenPressure = mcp342x_measure(dev_handle, &mcp_conf);
                     break;
-                //channel 2 of adc
+                // channel 2 of adc
                 case 2:
-                    ts_data.fcCurrentRaw = mcp342x_measure(dev_handle,&mcp_conf);
+                    ts_data.fcCurrentRaw = mcp342x_measure(dev_handle, &mcp_conf);
                     break;
-                //channel 3 of adc
+                // channel 3 of adc
                 case 3:
-                    ts_data.fcVoltageRaw = mcp342x_measure(dev_handle,&mcp_conf);
+                    ts_data.fcVoltageRaw = mcp342x_measure(dev_handle, &mcp_conf);
                     break;
                 default:
                     break;
             }
-            ESP_LOGI("I2C - meas", "channel: %d, value: %lf", i, mcp342x_measure(dev_handle,&mcp_conf));
+            ESP_LOGI("I2C - meas", "channel: %d, value: %lf", i, mcp342x_measure(dev_handle, &mcp_conf));
             vTaskDelay(200 / portTICK_PERIOD_MS);
         }
-	}///////////end of while
+    }
 }
+
+static void status_led_init()
+{
+    ledc_timer_config_t ledc_timer = {
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .timer_num = LEDC_TIMER_0,
+        .duty_resolution = LEDC_TIMER_13_BIT,
+        .freq_hz = 4000,
+        .clk_cfg = LEDC_AUTO_CLK,
+    };
+    ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
+
+    ledc_channel_config_t ledc_channel = {
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .channel = LEDC_CHANNEL_0,
+        .timer_sel = LEDC_TIMER_0,
+        .intr_type = LEDC_INTR_DISABLE,
+        .gpio_num = 22,
+        .duty = 0, // (2^13 - 1) * 50% = 4096
+        .hpoint = 0,
+    };
+    ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
+}
+
 void app_main(void)
 {
-    // CO_ESP32_init();
+    status_led_init();
 
     start_gps();
     wifi_init();
     mqtt_init();
     uart_init(on_uart_receive);
-
-    xTaskCreatePinnedToCore(adc_handler, "adc read", 1024 * 4, NULL, 10, &handle_adc, 1);
-    uint8_t temp[4] = { 0x12, 'x', 'D', 0x17 };
+    xTaskCreatePinnedToCore(adc_handler, "adc_read", 1024 * 4, NULL, 10, &handle_adc, 0);
 
     while (1)
     {
         if (has_received_uart_data)
         {
             send_telemetry_server_data();
+            ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 8191));
+            ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
         }
 
         vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+        // uint8_t temp[4] = { 0x12, 'x', 'D', 0x17 };
         // uart_send_data(temp, 4);
     }
 }

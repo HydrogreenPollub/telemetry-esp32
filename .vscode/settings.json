@@ -2,7 +2,7 @@
     "idf.adapterTargetName": "esp32",
     "idf.port": "/dev/ttyUSB0",
     "idf.openOcdConfigs": [
-        "board/esp32-bridge.cfg"
+        "board/esp32-wrover-kit-3.3v.cfg"
     ],
     "files.associations": {
         "canopennode_esp32.h": "c",

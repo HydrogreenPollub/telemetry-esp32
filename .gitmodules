@@ -6,3 +6,6 @@
 	path = components/gps-component-esp32
 	url = https://github.com/HydrogreenPollub/gps-component-esp32
 	
+[submodule "components/adc-mcp342x"]
+	path = components/adc-mcp342x
+	url = https://github.com/HydrogreenPollub/adc-mcp342x

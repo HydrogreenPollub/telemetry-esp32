@@ -2,6 +2,8 @@
 #include "esp_log.h"
 
 const char* TAG_UART = "UART";
+const uint8_t UART_EXPECTED_LENGTH = 64;
+
 void (*callback)(uint8_t*, uint32_t) = NULL;
 
 void uart_read_task()
@@ -11,14 +13,14 @@ void uart_read_task()
     while (1)
     {
         uint32_t len = uart_read_bytes(CONFIG_UART_NUM, rx_data, 128, 64 / portTICK_PERIOD_MS);
-        if (len == 64)
+        if (len == UART_EXPECTED_LENGTH)
         {
             ESP_LOGI(TAG_UART, "Frame length: %d", (int) len);
 
             // ESP_LOG_BUFFER_HEXDUMP(TAG_UART, rx_data, len, 2);
             callback(rx_data, len);
         }
-        else if (len != 64 && len > 0)
+        else if (len != UART_EXPECTED_LENGTH && len > 0)
         {
             ESP_LOGI(TAG_UART, "Frame with %lu size has been received (expected: %d)", len, 64);
         }
