@@ -10,18 +10,17 @@ void uart_read_task()
     ESP_LOGI(TAG_UART, "RX buffer length after initialization: %d \n", sizeof(rx_data));
     while (1)
     {
-        uint32_t len = uart_read_bytes(CONFIG_UART_NUM, rx_data, 64, 20 / portTICK_PERIOD_MS);
-        if (len > 0)
+        uint32_t len = uart_read_bytes(CONFIG_UART_NUM, rx_data, 128, 64 / portTICK_PERIOD_MS);
+        if (len == 64)
         {
-            ESP_LOGI(TAG_UART, "Frame length: %d \n", (int) len);
-            // ESP_LOGI(TAG_UART, "%hhu,%f,%f,%f,%f,%f,%f,%f,%hu,%f,%hhu,%f\n", vehicle_state_data.logic_state,
-            //     vehicle_state_data.fc_current, vehicle_state_data.fc_sc_current, vehicle_state_data.sc_motor_current,
-            //     vehicle_state_data.fc_voltage, vehicle_state_data.sc_voltage,
-            //     vehicle_state_data.hydrogen_sensor_voltage, vehicle_state_data.fuel_cell_temperature,
-            //     vehicle_state_data.fan_rpm, vehicle_state_data.vehicle_speed, vehicle_state_data.motor_pwm,
-            //     vehicle_state_data.hydrogen_pressure);
-            ESP_LOG_BUFFER_HEXDUMP(TAG_UART, rx_data, len, 2);
+            ESP_LOGI(TAG_UART, "Frame length: %d", (int) len);
+
+            // ESP_LOG_BUFFER_HEXDUMP(TAG_UART, rx_data, len, 2);
             callback(rx_data, len);
+        }
+        else if (len != 64 && len > 0)
+        {
+            ESP_LOGI(TAG_UART, "Frame with %lu size has been received (expected: %d)", len, 64);
         }
     }
 }
@@ -41,12 +40,10 @@ void uart_init(void (*on_read_callback)(uint8_t*, uint32_t))
     };
 
     ESP_LOGI(TAG_UART, "Start UART & RS422 application configuration.");
-    ESP_ERROR_CHECK(uart_driver_install(uart_num, CONFIG_BUF_SIZE * 2, 0, 0, NULL, 0));
+    ESP_ERROR_CHECK(uart_driver_install(uart_num, CONFIG_BUF_SIZE * 4, CONFIG_BUF_SIZE * 4, CONFIG_BUF_SIZE, NULL, 0));
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(uart_num, CONFIG_TXD_PIN, CONFIG_RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-
-    ESP_ERROR_CHECK(uart_set_mode(uart_num, UART_MODE_RS485_HALF_DUPLEX));
-    ESP_ERROR_CHECK(uart_set_rx_timeout(uart_num, 3));
+    // ESP_ERROR_CHECK(uart_set_rx_timeout(uart_num, 3));
 
     xTaskCreate(uart_read_task, "uart_task", 4 * 1024, NULL, 8, NULL);
 }

@@ -18,7 +18,8 @@
         "*.ipp": "c",
         "format": "c",
         "*.tcc": "c",
-        "charconv": "c"
+        "charconv": "c",
+        "random": "c"
     },
     "idf.flashType": "UART",
 }

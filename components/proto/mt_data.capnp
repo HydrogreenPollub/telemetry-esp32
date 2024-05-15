@@ -22,4 +22,7 @@ struct MTData {
     vehicleSpeed @17 :Float32;
     motorPwm @18 :Int32;
     hydrogenPressure @19 :Float32;
+
+    motorSpeed @20 :Float32;
+    motorCurrent @21 :Float32;
 }

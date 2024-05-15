@@ -20,6 +20,7 @@ TaskHandle_t handle_adc;
 
 telemetry_server_data_t ts_data;
 master_telemetry_data_t mt_data;
+static bool has_received_uart_data = false;
 
 params_send_mqtt_t ts_params = {
     .buffer_len = 0,
@@ -46,11 +47,17 @@ static void gps_event_handler(void* event_handler_arg, esp_event_base_t event_ba
             ESP_LOGI(TAG,
                 "%d/%d/%d %d:%d:%d => \r\n"
                 "\tlatitude   = %.05f°N\r\n"
-                "\tlongitude = %.05f°E\r\n"
+                "\tlongitude  = %.05f°E\r\n"
                 "\taltitude   = %.02fm\r\n"
                 "\tspeed      = %fm/s",
                 gps->date.year + YEAR_BASE, gps->date.month, gps->date.day, gps->tim.hour + TIME_ZONE, gps->tim.minute,
                 gps->tim.second, gps->latitude, gps->longitude, gps->altitude, gps->speed);
+
+            ts_data.gpsAltitude = gps->latitude;
+            ts_data.gpsLatitude = gps->latitude;
+            ts_data.gpsLongitude = gps->longitude;
+            ts_data.gpsSpeed = gps->speed;
+
             break;
         case GPS_UNKNOWN:
             /* print unknown statements */
@@ -83,8 +90,22 @@ void on_uart_receive(uint8_t* rx_buffer, uint32_t size)
     mt_params.buffer_len = (ssize_t) size;
     int result = deserialize_master_telemetry_data(&mt_data, mt_params.serialized_data, &(mt_params.buffer_len));
 
-    ts_data.vehicleSpeed = mt_data.vehicleSpeed;
-    // TODO add the rest
+    ts_data.fanRpm = mt_data.fanRpm;
+    ts_data.fcCurrent = mt_data.fcCurrent;
+    ts_data.fcScCurrent = mt_data.fcScCurrent;
+    ts_data.fcVoltage = mt_data.fcVoltage;
+    ts_data.fuelCellTemperature = mt_data.fuelCellTemperature;
+    ts_data.hydrogenCellOneButtonState = mt_data.hydrogenCellOneButtonState;
+    ts_data.hydrogenCellTwoButtonState = mt_data.hydrogenCellTwoButtonState;
+    ts_data.hydrogenPressure = mt_data.hydrogenPressure;
+    ts_data.hydrogenSensorVoltage = mt_data.hydrogenSensorVoltage;
+    ts_data.isEmergency = mt_data.isEmergency;
+    ts_data.isHydrogenLeaking = mt_data.isHydrogenLeaking;
+    ts_data.isScRelayClosed = mt_data.isScRelayClosed;
+    ts_data.motorSpeed = ts_data.motorSpeed;
+    ts_data.motorCurrent = ts_data.motorCurrent;
+
+    has_received_uart_data = true;
 }
 
 
@@ -158,19 +179,23 @@ void adc_handler()
 void app_main(void)
 {
     // CO_ESP32_init();
-    // start_gps();
 
+    start_gps();
     wifi_init();
     mqtt_init();
     uart_init(on_uart_receive);
 
-    uint8_t temp[3] = { 'x', 'D', '\0' };
-    
     xTaskCreatePinnedToCore(adc_handler, "adc read", 1024 * 4, NULL, 10, &handle_adc, 1);
+    uint8_t temp[4] = { 0x12, 'x', 'D', 0x17 };
+
     while (1)
     {
-        send_telemetry_server_data();
+        if (has_received_uart_data)
+        {
+            send_telemetry_server_data();
+        }
+
         vTaskDelay(1000 / portTICK_PERIOD_MS);
-        uart_send_data(temp, 2);
+        // uart_send_data(temp, 4);
     }
 }

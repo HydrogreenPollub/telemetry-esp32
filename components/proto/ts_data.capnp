@@ -22,6 +22,14 @@ struct TSData {
     vehicleSpeed @17 :Float32;
     motorPwm @18 :Int32;
     hydrogenPressure @19 :Float32;
+
+    gpsLatitude @20 :Float32;
+    gpsLongitude @21 :Float32;
+    gpsAltitude @22 :Float32;
+    gpsSpeed @23 :Float32;
+
+    motorSpeed @24 :Float32;
+    motorCurrent @25 :Float32;
     fcCurrentRaw @20 :Float32;
     fcVoltageRaw @21 :Float32;
     mcCurrent @22 :Float32;
