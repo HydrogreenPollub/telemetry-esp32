@@ -10,11 +10,11 @@
 #include "OD.h"
 #include "gps_component.h"
 #include "proto_control.h"
-#include "mcp342x.h"
+#include "msc342x.h"
 
 #define I2C_PORT          0
-#define I2C_MASTER_SCL_IO 19
-#define I2C_MASTER_SDA_IO 18
+#define I2C_MASTER_SCL_IO 32
+#define I2C_MASTER_SDA_IO 21
 
 TaskHandle_t handle_adc;
 
@@ -97,7 +97,7 @@ void on_uart_receive(uint8_t* rx_buffer, uint32_t size)
     ts_data.fuelCellTemperature = mt_data.fuelCellTemperature;
     ts_data.hydrogenCellOneButtonState = mt_data.hydrogenCellOneButtonState;
     ts_data.hydrogenCellTwoButtonState = mt_data.hydrogenCellTwoButtonState;
-    ts_data.hydrogenPressure = mt_data.hydrogenPressure;
+    // ts_data.hydrogenPressure = mt_data.hydrogenPressure;
     ts_data.hydrogenSensorVoltage = mt_data.hydrogenSensorVoltage;
     ts_data.isEmergency = mt_data.isEmergency;
     ts_data.isHydrogenLeaking = mt_data.isHydrogenLeaking;
@@ -202,16 +202,16 @@ void app_main(void)
     status_led_init();
 
     start_gps();
-    wifi_init();
-    mqtt_init();
+    // wifi_init();
+    // mqtt_init();
     uart_init(on_uart_receive);
-    xTaskCreatePinnedToCore(adc_handler, "adc_read", 1024 * 4, NULL, 10, &handle_adc, 0);
+    xTaskCreatePinnedToCore(adc_handler, "adc_read", 1024 * 4, NULL, 10, &handle_adc, 1);
 
     while (1)
     {
         if (has_received_uart_data)
         {
-            send_telemetry_server_data();
+            // send_telemetry_server_data();
             ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 8191));
             ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
         }
