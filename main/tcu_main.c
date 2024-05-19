@@ -10,7 +10,7 @@
 #include "OD.h"
 #include "gps_component.h"
 #include "proto_control.h"
-#include "msc342x.h"
+#include "mcp342x.h"
 
 #define I2C_PORT          0
 #define I2C_MASTER_SCL_IO 32
