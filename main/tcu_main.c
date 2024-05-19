@@ -15,7 +15,7 @@
 #define I2C_PORT          0
 #define I2C_MASTER_SCL_IO 32
 #define I2C_MASTER_SDA_IO 21
-
+#define MAP_2V_MAX 32088
 TaskHandle_t handle_adc;
 
 telemetry_server_data_t ts_data;
@@ -108,6 +108,10 @@ void on_uart_receive(uint8_t* rx_buffer, uint32_t size)
     has_received_uart_data = true;
 }
 
+float map(float x, float in_min, float in_max, float out_min, float out_max) {
+	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
 void adc_handler()
 {
     config_mcp3424_t mcp_conf = {
@@ -151,24 +155,28 @@ void adc_handler()
             {
                 // channel 0 of adc
                 case 0:
-                    ts_data.mcCurrent = mcp342x_measure(dev_handle, &mcp_conf);
+                    ts_data.mcCurrent = map(mcp342x_measure(dev_handle, &mcp_conf), 0, MAP_2V_MAX, 0, 50);
+                    ESP_LOGI("I2C - meas", "channel: %d, value: %f", i, ts_data.mcCurrent);
                     break;
                 // channel 1 of adc
                 case 1:
-                    ts_data.hydrogenPressure = mcp342x_measure(dev_handle, &mcp_conf);
+                    ts_data.hydrogenPressure = map(mcp342x_measure(dev_handle, &mcp_conf), 0, MAP_2V_MAX, 0, 50);
+                    ESP_LOGI("I2C - meas", "channel: %d, value: %f", i, ts_data.hydrogenPressure);
                     break;
                 // channel 2 of adc
                 case 2:
-                    ts_data.fcCurrentRaw = mcp342x_measure(dev_handle, &mcp_conf);
+                    ts_data.fcCurrentRaw = map(mcp342x_measure(dev_handle, &mcp_conf), 0, MAP_2V_MAX, 0, 50);
+                    ESP_LOGI("I2C - meas", "channel: %d, value: %f", i, ts_data.fcCurrentRaw);
                     break;
                 // channel 3 of adc
                 case 3:
-                    ts_data.fcVoltageRaw = mcp342x_measure(dev_handle, &mcp_conf);
+                    ts_data.fcVoltageRaw = map(mcp342x_measure(dev_handle, &mcp_conf), 0, MAP_2V_MAX, 0, 50);
+                    ESP_LOGI("I2C - meas", "channel: %d, value: %f", i, ts_data.fcVoltageRaw);
                     break;
                 default:
                     break;
             }
-            ESP_LOGI("I2C - meas", "channel: %d, value: %lf", i, mcp342x_measure(dev_handle, &mcp_conf));
+            
             vTaskDelay(200 / portTICK_PERIOD_MS);
         }
     }
