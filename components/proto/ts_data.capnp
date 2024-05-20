@@ -2,14 +2,14 @@
 
 struct TSData {
     isEmergency @0 :Bool;
-    isHydrogenLeaking @1 :Bool;
-    isScRelayClosed @2 :Bool;
-    vehicleIsSpeedButtonPressed @3 :Bool;
-    vehicleIsHalfSpeedButtonPressed @4 :Bool;
-    hydrogenCellOneButtonState @5 :Bool;
-    hydrogenCellTwoButtonState @6 :Bool;
-    isSuperCapacitorButtonPressed @7 :Bool;
-    logicState @8 :Int8;
+    isEmergencyButtonPressed @1 :Bool;
+    isEmergencySwitchToggled @2 :Bool;
+    isHydrogenLeaking @3 :Bool;
+    isScRelayClosed @4 :Bool;
+    isTimeResetButtonPressed @5 :Bool;
+    isHalfSpeedButtonPressed @6 :Bool;
+    isGasButtonPressed @7 :Bool;
+    fuelCellMode @8 :FuelCellMode;
 
     fcCurrent @9 :Float32;
     fcScCurrent @10 :Float32;
@@ -30,7 +30,17 @@ struct TSData {
 
     motorSpeed @24 :Float32;
     motorCurrent @25 :Float32;
-    fcCurrentRaw @20 :Float32;
-    fcVoltageRaw @21 :Float32;
-    mcCurrent @22 :Float32;
+    fcCurrentRaw @26 :Float32;
+    fcVoltageRaw @27 :Float32;
+    mcCurrent @28 :Float32;
+
+    lapNumber @29 :UInt8;
+
+    enum FuelCellMode {
+    	noneSelected @0;
+    	off @1;
+    	prepareToRace @2;
+    	race @3;
+    }
+
 }

@@ -23,14 +23,14 @@ void read_MTData(struct MTData *s capnp_unused, MTData_ptr p) {
 	capn_resolve(&p.p);
 	capnp_use(s);
 	s->isEmergency = (capn_read8(p.p, 0) & 1) != 0;
-	s->isHydrogenLeaking = (capn_read8(p.p, 0) & 2) != 0;
-	s->isScRelayClosed = (capn_read8(p.p, 0) & 4) != 0;
-	s->vehicleIsSpeedButtonPressed = (capn_read8(p.p, 0) & 8) != 0;
-	s->vehicleIsHalfSpeedButtonPressed = (capn_read8(p.p, 0) & 16) != 0;
-	s->hydrogenCellOneButtonState = (capn_read8(p.p, 0) & 32) != 0;
-	s->hydrogenCellTwoButtonState = (capn_read8(p.p, 0) & 64) != 0;
-	s->isSuperCapacitorButtonPressed = (capn_read8(p.p, 0) & 128) != 0;
-	s->logicState = (int8_t) ((int8_t)capn_read8(p.p, 1));
+	s->isEmergencyButtonPressed = (capn_read8(p.p, 0) & 2) != 0;
+	s->isEmergencySwitchToggled = (capn_read8(p.p, 0) & 4) != 0;
+	s->isHydrogenLeaking = (capn_read8(p.p, 0) & 8) != 0;
+	s->isScRelayClosed = (capn_read8(p.p, 0) & 16) != 0;
+	s->isTimeResetButtonPressed = (capn_read8(p.p, 0) & 32) != 0;
+	s->isHalfSpeedButtonPressed = (capn_read8(p.p, 0) & 64) != 0;
+	s->isGasButtonPressed = (capn_read8(p.p, 0) & 128) != 0;
+	s->fuelCellMode = (enum MTData_FuelCellMode)(int) capn_read16(p.p, 2);
 	s->fcCurrent = capn_to_f32(capn_read32(p.p, 4));
 	s->fcScCurrent = capn_to_f32(capn_read32(p.p, 8));
 	s->scMotorCurrent = capn_to_f32(capn_read32(p.p, 12));
@@ -42,19 +42,20 @@ void read_MTData(struct MTData *s capnp_unused, MTData_ptr p) {
 	s->vehicleSpeed = capn_to_f32(capn_read32(p.p, 36));
 	s->motorPwm = (int32_t) ((int32_t)capn_read32(p.p, 40));
 	s->hydrogenPressure = capn_to_f32(capn_read32(p.p, 44));
+	s->lapNumber = capn_read8(p.p, 1);
 }
 void write_MTData(const struct MTData *s capnp_unused, MTData_ptr p) {
 	capn_resolve(&p.p);
 	capnp_use(s);
 	capn_write1(p.p, 0, s->isEmergency != 0);
-	capn_write1(p.p, 1, s->isHydrogenLeaking != 0);
-	capn_write1(p.p, 2, s->isScRelayClosed != 0);
-	capn_write1(p.p, 3, s->vehicleIsSpeedButtonPressed != 0);
-	capn_write1(p.p, 4, s->vehicleIsHalfSpeedButtonPressed != 0);
-	capn_write1(p.p, 5, s->hydrogenCellOneButtonState != 0);
-	capn_write1(p.p, 6, s->hydrogenCellTwoButtonState != 0);
-	capn_write1(p.p, 7, s->isSuperCapacitorButtonPressed != 0);
-	capn_write8(p.p, 1, (uint8_t) (s->logicState));
+	capn_write1(p.p, 1, s->isEmergencyButtonPressed != 0);
+	capn_write1(p.p, 2, s->isEmergencySwitchToggled != 0);
+	capn_write1(p.p, 3, s->isHydrogenLeaking != 0);
+	capn_write1(p.p, 4, s->isScRelayClosed != 0);
+	capn_write1(p.p, 5, s->isTimeResetButtonPressed != 0);
+	capn_write1(p.p, 6, s->isHalfSpeedButtonPressed != 0);
+	capn_write1(p.p, 7, s->isGasButtonPressed != 0);
+	capn_write16(p.p, 2, (uint16_t) (s->fuelCellMode));
 	capn_write32(p.p, 4, capn_from_f32(s->fcCurrent));
 	capn_write32(p.p, 8, capn_from_f32(s->fcScCurrent));
 	capn_write32(p.p, 12, capn_from_f32(s->scMotorCurrent));
@@ -66,6 +67,7 @@ void write_MTData(const struct MTData *s capnp_unused, MTData_ptr p) {
 	capn_write32(p.p, 36, capn_from_f32(s->vehicleSpeed));
 	capn_write32(p.p, 40, (uint32_t) (s->motorPwm));
 	capn_write32(p.p, 44, capn_from_f32(s->hydrogenPressure));
+	capn_write8(p.p, 1, s->lapNumber);
 }
 void get_MTData(struct MTData *s, MTData_list l, int i) {
 	MTData_ptr p;

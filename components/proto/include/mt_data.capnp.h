@@ -26,16 +26,23 @@ typedef struct {capn_ptr p;} MTData_ptr;
 
 typedef struct {capn_ptr p;} MTData_list;
 
+enum MTData_FuelCellMode {
+	MTData_FuelCellMode_noneSelected = 0,
+	MTData_FuelCellMode_off = 1,
+	MTData_FuelCellMode_prepareToRace = 2,
+	MTData_FuelCellMode_race = 3
+};
+
 struct MTData {
 	unsigned isEmergency : 1;
+	unsigned isEmergencyButtonPressed : 1;
+	unsigned isEmergencySwitchToggled : 1;
 	unsigned isHydrogenLeaking : 1;
 	unsigned isScRelayClosed : 1;
-	unsigned vehicleIsSpeedButtonPressed : 1;
-	unsigned vehicleIsHalfSpeedButtonPressed : 1;
-	unsigned hydrogenCellOneButtonState : 1;
-	unsigned hydrogenCellTwoButtonState : 1;
-	unsigned isSuperCapacitorButtonPressed : 1;
-	int8_t logicState;
+	unsigned isTimeResetButtonPressed : 1;
+	unsigned isHalfSpeedButtonPressed : 1;
+	unsigned isGasButtonPressed : 1;
+	enum MTData_FuelCellMode fuelCellMode;
 	float fcCurrent;
 	float fcScCurrent;
 	float scMotorCurrent;
@@ -47,6 +54,7 @@ struct MTData {
 	float vehicleSpeed;
 	int32_t motorPwm;
 	float hydrogenPressure;
+	uint8_t lapNumber;
 };
 
 static const size_t MTData_word_count = 6;

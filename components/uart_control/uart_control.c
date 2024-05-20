@@ -2,7 +2,7 @@
 #include "esp_log.h"
 
 const char* TAG_UART = "UART";
-const uint8_t UART_EXPECTED_LENGTH = 64;
+const uint8_t UART_EXPECTED_LENGTH = 80;
 
 void (*callback)(uint8_t*, uint32_t) = NULL;
 

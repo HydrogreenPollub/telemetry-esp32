@@ -53,10 +53,10 @@ static void gps_event_handler(void* event_handler_arg, esp_event_base_t event_ba
                 gps->date.year + YEAR_BASE, gps->date.month, gps->date.day, gps->tim.hour + TIME_ZONE, gps->tim.minute,
                 gps->tim.second, gps->latitude, gps->longitude, gps->altitude, gps->speed);
 
-            // ts_data.gpsAltitude = gps->latitude;
-            // ts_data.gpsLatitude = gps->latitude;
-            // ts_data.gpsLongitude = gps->longitude;
-            // ts_data.gpsSpeed = gps->speed;
+            ts_data.gpsAltitude = gps->latitude;
+            ts_data.gpsLatitude = gps->latitude;
+            ts_data.gpsLongitude = gps->longitude;
+            ts_data.gpsSpeed = gps->speed;
 
             break;
         case GPS_UNKNOWN:
@@ -90,20 +90,36 @@ void on_uart_receive(uint8_t* rx_buffer, uint32_t size)
     mt_params.buffer_len = (ssize_t) size;
     int result = deserialize_master_telemetry_data(&mt_data, mt_params.serialized_data, &(mt_params.buffer_len));
 
-    ts_data.fanRpm = mt_data.fanRpm;
-    ts_data.fcCurrent = mt_data.fcCurrent;
-    ts_data.fcScCurrent = mt_data.fcScCurrent;
-    ts_data.fcVoltage = mt_data.fcVoltage;
-    ts_data.fuelCellTemperature = mt_data.fuelCellTemperature;
-    ts_data.hydrogenCellOneButtonState = mt_data.hydrogenCellOneButtonState;
-    ts_data.hydrogenCellTwoButtonState = mt_data.hydrogenCellTwoButtonState;
-    // ts_data.hydrogenPressure = mt_data.hydrogenPressure;
-    ts_data.hydrogenSensorVoltage = mt_data.hydrogenSensorVoltage;
     ts_data.isEmergency = mt_data.isEmergency;
+    ts_data.isEmergencyButtonPressed = mt_data.isEmergencyButtonPressed;
+    ts_data.isEmergencySwitchToggled = mt_data.isEmergencySwitchToggled;
     ts_data.isHydrogenLeaking = mt_data.isHydrogenLeaking;
     ts_data.isScRelayClosed = mt_data.isScRelayClosed;
-    // ts_data.motorSpeed = mt_data.motorSpeed;
-    // ts_data.motorCurrent = mt_data.motorCurrent;
+    ts_data.isTimeResetButtonPressed = mt_data.isTimeResetButtonPressed;
+    ts_data.isHalfSpeedButtonPressed = mt_data.isHalfSpeedButtonPressed;
+    ts_data.isGasButtonPressed = mt_data.isGasButtonPressed;
+    ts_data.fuelCellMode = mt_data.fuelCellMode;
+
+    ts_data.fcCurrent = mt_data.fcCurrent;
+    ts_data.fcScCurrent = mt_data.fcScCurrent;
+    ts_data.scMotorCurrent = mt_data.scMotorCurrent;
+    ts_data.fcVoltage = mt_data.fcVoltage;
+    ts_data.scVoltage = mt_data.scVoltage;
+    ts_data.hydrogenSensorVoltage = mt_data.hydrogenSensorVoltage;
+    ts_data.fuelCellTemperature = mt_data.fuelCellTemperature;
+    ts_data.fanRpm = mt_data.fanRpm;
+    ts_data.vehicleSpeed = mt_data.vehicleSpeed;
+    ts_data.motorPwm = mt_data.motorPwm;
+    // ts_data.hydrogenPressure = mt_data.hydrogenPressure;
+
+    /*
+    ts_data.motorSpeed = mt_data.motorSpeed;
+    ts_data.motorCurrent = mt_data.motorCurrent;
+    ts_data.fcCurrentRaw = mt_data.fcCurrentRaw;
+    ts_data.fcVoltageRaw = mt_data.fcVoltageRaw;
+    ts_data.mcCurrent = mt_data.mcCurrent;
+    */
+    ts_data.lapNumber = mt_data.lapNumber;
 
     has_received_uart_data = true;
 }
@@ -202,8 +218,8 @@ void app_main(void)
     status_led_init();
 
     start_gps();
-    // wifi_init();
-    // mqtt_init();
+    wifi_init();
+    mqtt_init();
     uart_init(on_uart_receive);
     xTaskCreatePinnedToCore(adc_handler, "adc_read", 1024 * 4, NULL, 10, &handle_adc, 1);
 
