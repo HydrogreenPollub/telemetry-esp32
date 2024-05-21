@@ -236,16 +236,16 @@ void app_main(void)
     wifi_init();
     mqtt_init();
     uart_init(on_uart_receive);
-    // xTaskCreatePinnedToCore(adc_handler, "adc_read", 1024 * 4, NULL, 10, &handle_adc, 1);
+    xTaskCreatePinnedToCore(adc_handler, "adc_read", 1024 * 4, NULL, 10, &handle_adc, 1);
 
     while (1)
     {
-        // if (has_received_uart_data)
-        // {
+        if (has_received_uart_data)
+        {
             send_telemetry_server_data();
             // ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 8191));
             // ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
-        // }
+        }
 
         vTaskDelay(1000 / portTICK_PERIOD_MS);
 

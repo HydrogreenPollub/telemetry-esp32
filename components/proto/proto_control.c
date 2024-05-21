@@ -22,7 +22,7 @@ int serialize_telemetry_server_data(telemetry_server_data_t ts_data, uint8_t* ou
     // Write structure data to buffer
     *output_data_len = capn_write_mem(&c, output_data, 4096, 0 /* packed */);
 
-    ESP_LOG_BUFFER_HEXDUMP("CAPNP OUTPUT", output_data, *output_data_len, ESP_LOG_INFO);
+    // ESP_LOG_BUFFER_HEXDUMP("CAPNP OUTPUT", output_data, *output_data_len, ESP_LOG_INFO);
     ESP_LOGI("CAPNP OUTPUT", "Serialized length: %d", *output_data_len);
     capn_free(&c);
 
@@ -42,10 +42,10 @@ int deserialize_master_telemetry_data(master_telemetry_data_t* ms_data, uint8_t*
 
     capn_free(&c);
 
-    ESP_LOGI("CAPNP INPUT", "%f,%f,%f,%f,%f,%f,%f,%lu,%f,%lu,%f", ms_data->fcCurrent, ms_data->fcScCurrent,
-        ms_data->scMotorCurrent, ms_data->fcVoltage, ms_data->scVoltage, ms_data->hydrogenSensorVoltage,
-        ms_data->fuelCellTemperature, ms_data->fanRpm, ms_data->vehicleSpeed, ms_data->motorPwm,
-        ms_data->hydrogenPressure);
+    // ESP_LOGI("CAPNP INPUT", "%f,%f,%f,%f,%f,%f,%f,%lu,%f,%lu,%f", ms_data->fcCurrent, ms_data->fcScCurrent,
+    //     ms_data->scMotorCurrent, ms_data->fcVoltage, ms_data->scVoltage, ms_data->hydrogenSensorVoltage,
+    //     ms_data->fuelCellTemperature, ms_data->fanRpm, ms_data->vehicleSpeed, ms_data->motorPwm,
+    //     ms_data->hydrogenPressure);
     // ESP_LOG_BUFFER_HEXDUMP("CAPNP INPUT", input_data, *input_data_len, ESP_LOG_INFO);
     // ms_data->fuelCellTemperature = 2137;
 
