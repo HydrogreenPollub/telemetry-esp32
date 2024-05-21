@@ -38,6 +38,7 @@ static const char* TAG = "gps_demo";
 
 static void gps_event_handler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
+    ESP_LOGI("GPS","handler_enter");
     gps_t* gps = NULL;
     switch (event_id)
     {
@@ -75,7 +76,11 @@ static void start_gps()
     /* init NMEA parser library */
     nmea_parser_handle_t nmea_hdl = nmea_parser_init(&config);
     /* register event handler for NMEA parser library */
-    nmea_parser_add_handler(nmea_hdl, gps_event_handler, NULL);
+    if(nmea_parser_add_handler(nmea_hdl, gps_event_handler, NULL)==ESP_OK)
+        ESP_LOGI("GPS","add hander ok");
+    else 
+        ESP_LOGI("GPS","add handler fail");
+    
 }
 
 void send_telemetry_server_data()
@@ -164,36 +169,38 @@ void adc_handler()
     {
         for (i = 0; i < 4; i++)
         {
+            // i=1;
             mcp_conf._channel = i;
             mcp342x_init(&mcp_conf, dev_handle);
             mcp342x_new_conversion(dev_handle, &mcp_conf);
+            
             switch (i)
             {
                 // channel 0 of adc
                 case 0:
                     ts_data.mcCurrent = map(mcp342x_measure(dev_handle, &mcp_conf), 0, MAP_2V_MAX, 0, 50);
-                    ESP_LOGI("I2C - meas", "channel: %d, value: %f", i, ts_data.mcCurrent);
+                    ESP_LOGI("I2C - meas", "channel: %d, value: %f\n\n", i, ts_data.mcCurrent);
                     break;
                 // channel 1 of adc
                 case 1:
                     ts_data.hydrogenPressure = map(mcp342x_measure(dev_handle, &mcp_conf), 0, MAP_2V_MAX, 0, 50);
-                    ESP_LOGI("I2C - meas", "channel: %d, value: %f", i, ts_data.hydrogenPressure);
+                    ESP_LOGI("I2C - meas", "channel: %d, value: %f\n\n", i, ts_data.hydrogenPressure);
                     break;
                 // channel 2 of adc
                 case 2:
                     ts_data.fcCurrentRaw = map(mcp342x_measure(dev_handle, &mcp_conf), 0, MAP_2V_MAX, 0, 50);
-                    ESP_LOGI("I2C - meas", "channel: %d, value: %f", i, ts_data.fcCurrentRaw);
+                    ESP_LOGI("I2C - meas", "channel: %d, value: %f\n\n", i, ts_data.fcCurrentRaw);
                     break;
                 // channel 3 of adc
                 case 3:
                     ts_data.fcVoltageRaw = map(mcp342x_measure(dev_handle, &mcp_conf), 0, MAP_2V_MAX, 0, 50);
-                    ESP_LOGI("I2C - meas", "channel: %d, value: %f", i, ts_data.fcVoltageRaw);
+                    ESP_LOGI("I2C - meas", "channel: %d, value: %f\n\n", i, ts_data.fcVoltageRaw);
                     break;
                 default:
                     break;
             }
             
-            vTaskDelay(200 / portTICK_PERIOD_MS);
+            vTaskDelay(500 / portTICK_PERIOD_MS);
         }
     }
 }
@@ -229,16 +236,16 @@ void app_main(void)
     wifi_init();
     mqtt_init();
     uart_init(on_uart_receive);
-    xTaskCreatePinnedToCore(adc_handler, "adc_read", 1024 * 4, NULL, 10, &handle_adc, 1);
+    // xTaskCreatePinnedToCore(adc_handler, "adc_read", 1024 * 4, NULL, 10, &handle_adc, 1);
 
     while (1)
     {
-        if (has_received_uart_data)
-        {
-            // send_telemetry_server_data();
-            ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 8191));
-            ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
-        }
+        // if (has_received_uart_data)
+        // {
+            send_telemetry_server_data();
+            // ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 8191));
+            // ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
+        // }
 
         vTaskDelay(1000 / portTICK_PERIOD_MS);
 
